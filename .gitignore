@@ -1,0 +1,10 @@
+*.un~
+.tidyall.d/
+.~*
+nytprof
+nytprof.out
+tmp/*
+kristof/*
+ffmpeg
+ffprobe
+
