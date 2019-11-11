@@ -17,6 +17,7 @@ use Carp;
 use Try::Tiny;
 use YAML::XS;
 use Log::Log4perl;
+use Mosaic::Input;
 
 our $VERSION = '0.11';
 
@@ -38,7 +39,7 @@ sub _build_config {
 
     my $configFile = $self->configFile;
 
-    say "-->",$configFile;
+    say "-->", $configFile;
 
     $configFile = glob($configFile);
 
@@ -73,10 +74,35 @@ sub _build_config {
 sub validateConfig {
     my ($self) = @_;
 
-    my $configuration = $self->config;
+    my $c         = $self->config;
+    my @errorList = ();
+    my $source    = {};
 
-    return 1;
-    return 0;
+    # source defined?
+    if ( exists $c->{source} ) {
+        foreach my $input ( sort keys %{ $c->{source} } ) {
+            try {
+                $source->{$input} = Mosaic::Input->new( $c->{source}{$input} );
+            }
+            catch {
+                if (m/.+"(.+)".+: (.+) at \(.*/) {
+                    push( @errorList, "$1 $2" );
+                } else {
+                    push( @errorList, $_ );
+                }
+            } ## end catch
+        } ## end foreach my $input ( sort keys...)
+    } else {
+        push( @errorList, "missing specification of source" );
+    }
+
+    # service defined?
+
+    # output defined?
+    #
+    say join( "\n", @errorList);
+
+    return scalar @errorList == 0;
 } ## end sub validateConfig
 
 =head3 report ( )
@@ -87,6 +113,8 @@ sub validateConfig {
 
 sub report {
     my ($self) = @_;
+
+    return YAML::XS::Dump( $self->config );
 }
 
 =head3 buildCmd ( )

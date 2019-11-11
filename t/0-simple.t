@@ -15,4 +15,4 @@ my $m = Mosaic->new( configFile => 't/sample.yaml');
 
 isa_ok( $m, 'Mosaic' );
 
-ok( $m->validateConfig(), 'Validation');
+ok( $m->validateConfig(), 'Validate sample.yaml');
