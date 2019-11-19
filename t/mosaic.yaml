@@ -2,26 +2,38 @@
 # mosaicBuilder configuration file
 # ffprobe -show_programs  -of json -i udp://@239.10.10.1:1234 | less
 source:
-  - name: multicast1
-    source: udp://@239.10.10.1:1234
-  - name: multicast2
-    source: udp://@239.10.10.99:5500
+  multicast1:
+    url: udp://@239.10.10.1:1234
+  multicast2:
+    url: file://kratek.ts
+  file1:
+    url: ts_kratek.ts
 service:
-  - id: 1
+  1:
     name: TV SLO 1
     source: multicast1
     video: 0
     audio: 2
-  - id: 4
+  mm:
     name: TV SLO 1
     source: multicast1
     video: 5
     audio: 9
+  test:
+    name: TV SLO 1
+    source: multicast2
+    video: 0
+    audio: 2
+  3:
+    name: Maribor
+    source: file1
+    video: 0
+    audio: 1
 output:
   format: my2x2
   size: 1920x1080
   destination: 239.10.10.1:1234
   mosaic:
-    - 1
-    - 4
-
+    - 3
+    - 3
+    - mm
