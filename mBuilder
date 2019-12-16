@@ -67,18 +67,18 @@ my $configFile = shift(@ARGV) // "mosaic.yaml";
 
 my $app = Mosaic->new( configFile => $configFile );
 
-if ( $app->validateConfig() ) {
+if ( $app->compileConfig() ) {
     say("Configuration invalid");
     exit(1);
 }
 
-$app->report();
+say $app->report();
 
 if ( exists $args{c} ) {
     # just validate
     exit;
 } else {
-    $app->buildCmd();
+    say $app->buildCmd();
     exit;
 }
 

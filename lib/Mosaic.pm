@@ -36,7 +36,8 @@ sub BUILD {
     $self->{output}    = {
         frameList   => [],
         serviceList => [],
-        sourceList  => []
+        sourceList  => [],
+        cmd         => []
     };
 
     return;
@@ -71,16 +72,18 @@ sub _build_config {
     }
 } ## end sub _build_config
 
-=head3 validateConfig ( )
+=head3 compileConfig ( )
 
- Check the configuration file for correctnes.
+ Check the configuration file for correctness and build cross configuration.
 
 =cut
 
-sub validateConfig {
+sub compileConfig {
     my ($self) = @_;
 
+
     my $c = $self->config;
+    say YAML::XS::Dump($self);
 
     # source defined?
     if ( exists $c->{source} ) {
@@ -105,14 +108,20 @@ sub validateConfig {
         my $o      = $c->{output};
         my $output = $self->{output};
 
-        if ( exists $o->{format} ) {
-            $output->{format} = $o->{format};
+        if ( exists $o->{format} && $o->{format} =~ m/.*(\d+)x(\d).*/ ) {
+            $output->{format} = {
+                x => $1,
+                y => $2
+            };
         } else {
-            $self->error("no output defined");
+            $self->error( "no format defined [" . $o->{format} . "]" );
         }
 
-        if ( exists $o->{size} ) {
-            $output->{size} = $o->{size};
+        if ( exists $o->{size} && $o->{size} =~ m/.*?(\d+)x(\d+).*?/ ) {
+            $output->{size} = {
+                x => $1,
+                y => $2
+            };
         } else {
             $self->error("no size defined");
         }
@@ -123,21 +132,19 @@ sub validateConfig {
             $self->error("no destination defined");
         }
 
-        if ( exists $o->{mosaic} ) {
-
-            foreach my $serviceId ( @{ $o->{mosaic} } ) {
-                $self->frameAdd($serviceId);
-            }
-        } else {
-            $self->error("no framesin output");
+        if ( exists $o->{layout} ) {
+            $output->{layout} = $o->{layout};
         }
+
     } ## end if ( exists $c->{output...})
+
+    $self->buildScreen( $self->{output} );
 
     # cleanup the configuration
     $self->fixConfig();
 
     return scalar $self->{errorList};
-} ## end sub validateConfig
+} ## end sub compileConfig
 
 =head3 error ( )
 
@@ -215,15 +222,26 @@ sub serviceAdd {
 
 =head3 frameAdd ( )
 
- Insert frames to output list
+ Add frame to output screen
 
 =cut
 
 sub frameAdd {
-    my ( $self, $serviceId ) = @_;
+    my ( $self, $serviceId, $x, $y, $width, $height ) = @_;
 
     if ( exists $self->{service}{$serviceId} ) {
-        push( @{ $self->{output}{frameList} }, $serviceId );
+        my $frame = {
+            serviceId => $serviceId,
+            position  => {
+                x => $x,
+                y => $y
+            },
+            size => {
+                width  => $width,
+                height => $height
+            }
+        };
+        push( @{ $self->{output}{frameList} }, $frame );
 
         # mark used services
         if ( exists $self->{service}{$serviceId}{count} ) {
@@ -246,7 +264,7 @@ sub frameAdd {
 
 =head3 fixConfig ( )
 
- Clean unused sources and services and copy to output.
+ Clean unused sources, services and copy them to output.
 
 =cut
 
@@ -272,17 +290,22 @@ sub fixConfig {
     }
 
     # copy sources to output
-    foreach my $sourceId ( sort( { $self->{source}{$a}{order} <=> $self->{source}{$b}{order} } keys $self->{source} ) ) {
+    foreach my $sourceId ( sort( { $self->{source}{$a}{order} <=> $self->{source}{$b}{order} } keys %{ $self->{source} } ) ) {
         my $source = $self->{source}{$sourceId};
         push( @{ $self->{output}{sourceList} }, $source );
     }
 
     # copy service to output
-    foreach my $serviceId ( @{ $self->{output}{frameList} } ) {
-        my $service = $self->{service}{$serviceId};
-        push( @{ $self->{output}{serviceList} }, $service );
-    }
-        
+    foreach my $frame ( @{ $self->{output}{frameList} } ) {
+        if ( exists $frame->{serviceId} ) {
+            say "**";
+            my $serviceId = $frame->{serviceId};
+            my $service   = $self->{service}{$serviceId};
+            push( @{ $self->{output}{serviceList} }, $service );
+            $frame->{name} = $service->{name};
+        } ## end if ( exists $frame->{serviceId...})
+    } ## end foreach my $frame ( @{ $self...})
+
     delete $self->{source};
     delete $self->{servcie};
 
@@ -296,40 +319,125 @@ sub fixConfig {
 
 sub report {
     my ($self) = @_;
+    my $line = "";
 
-    say("Sources:");
+    $line .= "Sources:\n";
     foreach my $source ( @{ $self->{output}{sourceList} } ) {
-        printf( "  %2i  %s\n", $source->{order}, $source->{url} );
+        $line .= sprintf( "  %2i  %s\n", $source->{order}, $source->{url} );
     }
 
-    say("Components:");
+    $line .= "Components:\n";
     foreach my $service ( @{ $self->{output}{serviceList} } ) {
-        printf( "  %s\n", $service->{name} );
+        $line .= sprintf( "  %s\n", $service->{name} );
         foreach my $component ( 'video', 'audio' ) {
             my $source = $service->{source};
             my $id     = $service->{$component};
             my $tag    = $component =~ /video/ ? 'v' : 'a';
-            printf( "    %2i:%s:%i %s\n", $source, $tag, $id, $component );
+            $line .= sprintf( "   %2i:%s:%i %s\n", $source, $tag, $id, $component );
         } ## end foreach my $component ( 'video'...)
     } ## end foreach my $service ( @{ $self...})
 
-    say("Output:");
-    say("  ",$self->{output}{format});
-    say("  ",$self->{output}{size});
-    say("  ",$self->{output}{destination});
-#    say YAML::XS::Dump( $self->{output});
+    $line .= "Output:\n";
+    $line .= "  " . $self->{output}{format}{x} . "x" . $self->{output}{format}{y} . "\n";
+    $line .= "  " . $self->{output}{size}{x} . "x" . $self->{output}{size}{y} . "\n";
+    $line .= "  " . $self->{output}{destination} . "\n";
+
+    $line .= "  Frames:\n";
+    foreach my $frame ( @{ $self->{output}{frameList} } ) {
+        $line .= "    " . $frame->{name} . "\n";
+        $line .= sprintf(
+            "      %4ix%4i-%4ix%4i\n",
+            $frame->{position}{x},
+            $frame->{position}{y},
+            $frame->{size}{width},
+            $frame->{size}{height}
+        );
+    } ## end foreach my $frame ( @{ $self...})
+
+    #   say YAML::XS::Dump( $self->{output});
+    return $line;
+
 } ## end sub report
+
+=head3 buildScreen()
+
+ Build the output screen from frames.
+
+=cut
+
+sub buildScreen {
+    my ( $self, $output ) = @_;
+
+    if ( ref $output->{layout} ne 'ARRAY' ) {
+        die "unsupported layout configuration";
+    }
+
+    say( "Output pixel size: ", $output->{size}{x},   "x", $output->{size}{y} );
+    say( "Output layout    : ", $output->{format}{x}, "x", $output->{format}{y} );
+
+    my $i         = 0;
+    my $maxFrames = $output->{format}{x} * $output->{format}{y};
+
+    my $line = "";
+
+    while ( $i < $maxFrames ) {
+
+        # get service from list
+        my $serviceId = $output->{layout}[$i];
+
+        # calculate column x row from $i
+        my $col = $i % $output->{format}{x};
+        my $row = int( $i / $output->{format}{x} );
+        $line .= "\n" if $col == 0;
+        $line .= sprintf( "[%7s    %2ix%2i] ", $serviceId // 'undef', $col, $row );
+
+        # and coordinates/width
+        my $x      = 0;
+        my $y      = 0;
+        my $width  = 0;
+        my $height = 0;
+
+        # add frame to screen
+        $self->frameAdd( $serviceId, $x, $y, $width, $height ) if $serviceId;
+
+#        $self->frameClockAdd( $x, $y, $width, $height);
+
+    } continue {
+        $i += 1;
+    }
+
+    say $line;
+} ## end sub buildScreen
 
 =head3 buildCmd()
 
-    Build commandline for starting the ffmpeg . This includes all specified input sources .
+ Build commandline for starting the ffmpeg . This includes all specified input sources .
 
 =cut
 
 sub buildCmd {
     my ($self) = @_;
 
-    return "";
-}
+    my @cmd = ();
+
+    push( @cmd, "ffmpeg -y -re" );
+
+    # sources
+    foreach my $source ( @{ $self->{output}{sourceList} } ) {
+        push( @cmd, "-i " . $source->{url} );
+    }
+
+    # map
+    foreach my $service ( @{ $self->{output}{serviceList} } ) {
+        foreach my $component ( 'video', 'audio' ) {
+            my $source = $service->{source};
+            my $id     = $service->{$component};
+            my $tag    = $component =~ /video/ ? 'v' : 'a';
+            push( @cmd, "-map " . $source . ":" . $tag . ":" . $id );
+        } ## end foreach my $component ( 'video'...)
+    } ## end foreach my $service ( @{ $self...})
+
+    return join( " ", @cmd );
+} ## end sub buildCmd
 
 1;
