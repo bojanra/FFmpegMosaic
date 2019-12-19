@@ -21,7 +21,7 @@ generate such an output.
  If no configuration file is found, mBuilder will use mosaic.yaml
 
 Please install:
- libsmart-comments-perl libbareword-filehandles-perl libindirect-perl libmultidimensional-perl libstrictures-perl
+ libsmart-comments-perl libbareword-filehandles-perl libindirect-perl libmultidimensional-perl libstrictures-perl liblog-log4perl-perl libmoo-perl
 
 =cut
 
@@ -79,6 +79,13 @@ if ( exists $args{c} ) {
     exit;
 } else {
     say $app->buildCmd();
+
+    # Zapis v FFmpeg file
+    my $mosaicFFmpeg = 'mosaic_FFmpeg.sh';
+    open(my $fh, '>', $mosaicFFmpeg);
+        print $fh $app->buildCmd();
+    close $fh;
+    
+    say $app->buildTlay();
     exit;
 }
-

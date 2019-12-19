@@ -17,6 +17,12 @@ use Try::Tiny;
 use YAML::XS;
 use Log::Log4perl;
 use Term::ANSIColor;
+use Image::Magick;
+use Math::Trig;
+use POSIX qw(strftime);
+use File::Copy;
+use Data::Dumper;
+
 
 our $VERSION = '0.11';
 
@@ -38,8 +44,9 @@ sub BUILD {
         serviceList => [],
         sourceList  => [],
         cmd         => []
-    };
-
+        };
+    $self->{topLayer} = {};
+    
     return;
 } ## end sub BUILD
 
@@ -97,7 +104,7 @@ sub compileConfig {
     # service defined?
     if ( exists $c->{service} ) {
         while ( my ( $serviceId, $value ) = each %{ $c->{service} } ) {
-            $self->serviceAdd( $serviceId, $value );
+            $self->serviceAdd( $serviceId, $value ); 
         }
     } else {
         $self->error("no service defined");
@@ -137,6 +144,38 @@ sub compileConfig {
         }
 
     } ## end if ( exists $c->{output...})
+
+    # Top layer defined
+    if ( exists $c->{topLayer} ) {
+        my $o        = $c->{topLayer};
+        my $topLayer = $self->{topLayer};
+        
+
+        if ( exists $o->{location} ) {
+            $topLayer->{location} = $o->{location};
+        }else{
+            $self->error("location no dif");
+        }
+
+        if ( exists $o->{clock} && $o->{clock} =~ m/.*?(\d+),(\d+),(\d+).*?/ ) {
+            $topLayer->{clock} = {
+                x => $1,
+                y => $2,
+                r => $3
+            }
+        }else{
+            $self->error("clock no dif");
+        }
+
+        if ( exists $o->{error} && $o->{error} =~ m/.*?(\d+),(\d+).*?/ ) {
+            $topLayer->{error} = {
+                n    => $1,
+                font => $2
+            }
+        }else{
+            $self->error("error no dif");
+        }
+    }
 
     $self->buildScreen( $self->{output} );
 
@@ -227,7 +266,7 @@ sub serviceAdd {
 =cut
 
 sub frameAdd {
-    my ( $self, $serviceId, $x, $y, $width, $height ) = @_;
+    my ( $self, $serviceId, $x, $y, $width, $height, $audiox, $audioy, $audioWidth, $audioHeight ) = @_;
 
     if ( exists $self->{service}{$serviceId} ) {
         my $frame = {
@@ -239,6 +278,14 @@ sub frameAdd {
             size => {
                 width  => $width,
                 height => $height
+            },
+            audioPosition  => {
+                x => $audiox,
+                y => $audioy
+            },
+            audioSize => {
+                width  => $audioWidth,
+                height => $audioHeight
             }
         };
         push( @{ $self->{output}{frameList} }, $frame );
@@ -346,11 +393,16 @@ sub report {
     foreach my $frame ( @{ $self->{output}{frameList} } ) {
         $line .= "    " . $frame->{name} . "\n";
         $line .= sprintf(
-            "      %4ix%4i-%4ix%4i\n",
+            "     v:%4ix%4i-%4ix%4i\n     a:%4ix%4i-%4ix%4i\n",
             $frame->{position}{x},
             $frame->{position}{y},
             $frame->{size}{width},
-            $frame->{size}{height}
+            $frame->{size}{height},
+            $frame->{audioPosition}{x},
+            $frame->{audioPosition}{y},
+            $frame->{audioSize}{width},
+            $frame->{audioSize}{height},
+
         );
     } ## end foreach my $frame ( @{ $self...})
 
@@ -387,18 +439,31 @@ sub buildScreen {
 
         # calculate column x row from $i
         my $col = $i % $output->{format}{x};
-        my $row = int( $i / $output->{format}{x} );
+        my $row = int( $i / $output->{format}{y} );
         $line .= "\n" if $col == 0;
         $line .= sprintf( "[%7s    %2ix%2i] ", $serviceId // 'undef', $col, $row );
 
         # and coordinates/width
-        my $x      = 0;
-        my $y      = 0;
-        my $width  = 0;
-        my $height = 0;
+        my $spacingX = int( $output->{size}{x}*0.02 / ($output->{format}{x}-1) );
+        my $spacingY = int($spacingX* 9/16);
+        my $edgeX    = int( $output->{size}{x}*0.01/2);
+        my $edgeY    = int($edgeX* 9/16);
+        
+        my $width  = int( $output->{size}{x}*(1-0.02-0.01) / $output->{format}{x} );
+        my $height = int($width* 9/16);
+
+        my $audioWidth  = 15;
+        my $audioHeight = $height-30;
+
+        my $x = $col * ($width + $spacingX) + $edgeX;
+        my $y = $row * ($height + $spacingY) + $edgeY;
+
+        my $audiox = $x + $width - $audioWidth*2-4;
+        my $audioy = $y;
+        
 
         # add frame to screen
-        $self->frameAdd( $serviceId, $x, $y, $width, $height ) if $serviceId;
+        $self->frameAdd( $serviceId, $x, $y, $width, $height, $audiox, $audioy, $audioWidth, $audioHeight ) if $serviceId;
 
 #        $self->frameClockAdd( $x, $y, $width, $height);
 
@@ -416,28 +481,524 @@ sub buildScreen {
 =cut
 
 sub buildCmd {
-    my ($self) = @_;
+    my ( $self) = @_;
+    my $topLayer = $self->{topLayer};
+
+    say YAML::XS::Dump( $topLayer);
 
     my @cmd = ();
 
-    push( @cmd, "ffmpeg -y -re" );
+    push( @cmd, "#!/bin/bash \n \n ffmpegX -y -re" );
 
     # sources
     foreach my $source ( @{ $self->{output}{sourceList} } ) {
-        push( @cmd, "-i " . $source->{url} );
+        push( @cmd, "-i \'". $source->{url} ."\'" );
     }
+    my $location = $self->{topLayer}{location};
+    push( @cmd, "-loop 1 -f image2 -r 5 -i '$location'" );
 
     # map
+    my $input = 0;
     foreach my $service ( @{ $self->{output}{serviceList} } ) {
-        foreach my $component ( 'video', 'audio' ) {
-            my $source = $service->{source};
-            my $id     = $service->{$component};
-            my $tag    = $component =~ /video/ ? 'v' : 'a';
-            push( @cmd, "-map " . $source . ":" . $tag . ":" . $id );
-        } ## end foreach my $component ( 'video'...)
+        my $source = $service->{source};
+
+        foreach my $component ( 'video', 'audio', 'audio1') {
+            next if ! exists $self->{service}{$component}; 
+            my $id    = $self->{service}{$component};
+            my $tag   = $component =~ /video/ ? 'v' : 'a';
+
+            push( @cmd, "-map $input:$tag:$id" );
+            $input++;
+        }
+    }
+    push( @cmd, "-map ".  @{ $self->{output}{serviceList} } .":v");
+    push( @cmd, "-filter_complex" );
+    
+
+    # imput scale
+    push( @cmd, " \" nullsrc=1920x1080, lutrgb=126:126:126 [base];");
+    foreach my $service ( @{ $self->{output}{serviceList} } ) {
+        my $source = $service->{source};
+        
+        foreach my $frame ( ${ $self->{output}{frameList} }[$source] ) {
+            my $name = $frame->{name};
+            my $scale;
+
+            foreach my $component ( 'video' ) {
+                my $id     = $service->{$component};
+                my $tag    = 'v';
+                my $width  = $frame->{size}{width};
+                my $height = $frame->{size}{height};
+
+                $scale = "[$source:$tag:$id] setpts=PTS-STARTPTS, scale=".$width."x".$height." [$name:v]; ";
+            }
+            push( @cmd, $scale );
+
+            foreach my $component ( 'audio' ) {
+                my $id          = $service->{$component};
+                my $tag         = 'a';
+                my $audioWidth  = $frame->{audioSize}{width};
+                my $audioHeight = $frame->{audioSize}{height};
+
+                $scale = "[$source:$tag:$id] showvolume=f=0.5:c=0x00ffff:b=4:w=$audioHeight:h=$audioWidth:o=v:ds=log:dm=2:p=1, format=yuv420p [$name:a];";
+            }
+            push( @cmd, $scale );
+
+        } 
     } ## end foreach my $service ( @{ $self...})
+    push( @cmd, "[".@{ $self->{output}{serviceList} }.":v] setpts=PTS-STARTPTS, scale=1920x1080 [topLayer]; " );
+
+    # parameters
+    push( @cmd, "[base]" );
+    foreach my $service ( @{ $self->{output}{serviceList} } ) {
+        my $source = $service->{source};
+
+        foreach my $frame ( ${ $self->{output}{frameList} }[$source] ) {
+            my $name = $frame->{name};
+            my $parameter;
+
+            foreach my $component ( 'video' ) {
+                my $tag = 'v';
+                my $x   = $frame->{position}{x};
+                my $y   = $frame->{position}{y};
+
+                $parameter = "[$name:v] overlay=shortest=1: x=$x: y=$y ";
+            }
+            push( @cmd, $parameter );
+
+            foreach my $component ( 'audio' ) {
+                my $tag    = 'a';
+                my $audiox = $frame->{audioPosition}{x};
+                my $audioy = $frame->{audioPosition}{y};
+
+                $parameter = "[$name:audioLayer]; [$name:audioLayer][$name:a] overlay=shortest=1:x=$audiox: y=$audioy [$name:layer]; [$name:layer]";
+            }
+            push( @cmd, $parameter );
+            
+        }
+    }
+    push( @cmd, "[topLayer] overlay=shortest=1: x=0: y=0 \"" );
+
+    push( @cmd, "-strict experimental -vcodec libx264 -b:v 4M -minrate 3M -maxrate 3M -bufsize 6M -preset ultrafast  -profile:v high -level 4.0 -an -threads 0\\
+    -f segment -segment_list /var/www/html/playlist.m3u8 -segment_list_flags +live -segment_time 10 /var/www/html/out%03d.ts");
+
+# -f mpegts udp://172.30.1.41:5000?pkt_size=1316");
+# -f segment -segment_list /var/www/html/playlist.m3u8 -segment_list_flags +live -segment_time 10 /var/www/html/out%03d.ts");
 
     return join( " ", @cmd );
+
 } ## end sub buildCmd
+
+
+
+=head3 buildTlay()
+
+ Build commandline top layer .
+
+=cut
+
+sub buildTlay {
+    my ( $self ) = @_;
+
+    my $topLayer = $self->{topLayer};
+
+    # default values
+    my $fontScaleX    = 0.6;
+    my $fontScaleY    = 1;
+    my $fond          = "/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf";
+    my $fh;
+
+    # izdelava osnovne plasti
+    my $upperLayer;
+    my $pictureFormat = "1920x1080";
+
+    $upperLayer = Image::Magick->new();
+    $upperLayer->Set(size=>$pictureFormat);
+    $upperLayer->ReadImage('canvas:transparent');
+
+
+    # Pisanje podatkov na zadnjo plast
+
+    foreach my $service ( @{ $self->{output}{serviceList} } ) {
+        my $source = $service->{source};
+
+        foreach my $frame ( ${ $self->{output}{frameList} }[$source] ) {
+            my $titleName              = $frame->{name};
+            my $videoFramePositionX    = $frame->{position}{x};
+            my $videoFramePositionY    = $frame->{position}{y};
+            my $videoFrameWidth        = $frame->{size}{width};
+            my $videoFrameHeight       = $frame->{size}{height};
+
+            # Izračun kordinat
+
+            # TITLE
+            my $titleFontSize     = 30;
+            my $titleRowTopOffset = 10;
+            my $titleOffsetX      = int(($videoFrameWidth - (length($titleName)*$titleFontSize*$fontScaleX))/2);
+            my $titleX            = $videoFramePositionX + $titleOffsetX;
+            my $titleY            = $videoFramePositionY + $titleRowTopOffset;
+
+            # MSG
+            my $msgFontSize        = 30;
+            my $msgRowBottomOffset = 0;
+            my $msgRowHight        = int($msgFontSize*$fontScaleY + $msgRowBottomOffset);
+                my $BR = "2,56 Mb";
+                my $MC = "239.239.100.200";
+                my $CC = ">56001";
+            my $msgX  = $videoFramePositionX;
+            my $msgY  = $videoFramePositionY + $videoFrameHeight - $msgRowHight;
+            my $msgX2 = $msgX+$videoFrameWidth;
+            my $msgY2 = $msgY+$msgFontSize;
+
+            #ERROR
+            my $errorFontSize = $topLayer->{error}{font};
+            my $errorX1 = $videoFramePositionX;
+            my $errorY1 = $videoFramePositionY;
+            my $errorX2 = $videoFramePositionX+$videoFrameWidth;
+            my $errorY2 = $videoFramePositionY+$videoFrameHeight;
+            my $errorTextX = int((1920-$videoFrameWidth)/2-$videoFramePositionX);
+            my $errorTextY = int((1080-$videoFrameHeight)/2-$videoFramePositionY);
+
+        # Urejanje ImegeMagic
+
+            # TITLE
+            $upperLayer->Annotate(
+                undercolor => '#e8ddce',
+                fill       => 'black',
+                font       => '/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf',
+                pointsize  => $titleFontSize,
+                geometry   => "+$titleX+$titleY",
+                gravity    => 'northwest',
+                text       => $titleName);
+
+            # MSG
+            $upperLayer->Draw(
+                fill      => 'white',
+                points    => "$msgX,$msgY $msgX2,$msgY2",
+                gravity   => 'northwest',
+                primitive => 'rectangle');
+
+            $upperLayer->Annotate(
+                fill      => 'black',
+                font      => '/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf',
+                pointsize => $msgFontSize,
+                geometry  => "+$msgX+$msgY",
+                gravity   => 'northwest',
+                text      => "$BR");
+
+            $upperLayer->Annotate(
+                fill      => 'black',
+                font      => '/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf',
+                pointsize => $msgFontSize,
+                geometry  => "-".int((1920-$videoFrameWidth)/2-$msgX)."+$msgY",
+                gravity   => 'north',
+                text      => "$MC");
+
+            $upperLayer->Annotate(
+                fill      => 'black',
+                font      => '/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf',
+                pointsize => $msgFontSize,
+                geometry  => "+".(1920-$videoFrameWidth-$msgX)."+$msgY",
+                gravity   => 'northeast',
+                text      => "$CC");
+
+            # ERROR
+            if( $topLayer->{error}{n} == $source ){
+                $upperLayer->Draw(
+                    fill      => 'rgba(255, 0, 0, 0.5)',
+                    points    => "$errorX1,$errorY1 $errorX2,$errorY2",
+                    gravity   => 'northwest',
+                    primitive => 'rectangle');
+
+                $upperLayer->Annotate(
+                    fill      => 'black',
+                    font      => '/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf',
+                    pointsize => $errorFontSize,
+                    geometry  => "-$errorTextX-$errorTextY",
+                    gravity   => 'center',
+                    text      => "ERROR");       
+            }
+        }
+    }
+
+
+    $upperLayer->Write('top_layer/upper_layer.png');
+
+    print "Upper layer generated\n";
+
+
+
+
+    ############################################### URA #####################################################
+
+
+    my $fixedClockLayer = Image::Magick->new();
+    $fixedClockLayer->Read('top_layer/upper_layer.png');
+
+    # Urino središče
+    my $clockCenterX = $topLayer->{clock}{x};
+    my $clockCenterY = $topLayer->{clock}{y};
+
+    # Krog
+    my $circleRadius = $topLayer->{clock}{r};
+    my $circleX      = $clockCenterX ;
+    my $circleY      = $clockCenterY;
+    my $circleOffSetEdgeX = $clockCenterX;
+    my $circleOffSetEdgeY = $clockCenterY - $circleRadius;
+
+    # Pozicija številk
+    my $clockCenterFromCenterX = int(1920/2 - $clockCenterX);
+    my $clockCenterFromCenterY = int(1080/2 - $clockCenterY);
+
+    my $numberOffSetCenter = $circleRadius*0.85;
+
+    my $number12X = $clockCenterFromCenterX;
+    my $number12Y = $clockCenterFromCenterY + $numberOffSetCenter;
+    my $number3X  = $clockCenterFromCenterX - $numberOffSetCenter;
+    my $number3Y  = $clockCenterFromCenterY;
+    my $number6X  = $clockCenterFromCenterX;
+    my $number6Y  = $clockCenterFromCenterY - $numberOffSetCenter;
+    my $number9X  = $clockCenterFromCenterX + $numberOffSetCenter;
+    my $number9Y  = $clockCenterFromCenterY;
+
+    # Pozicija datuma
+    my $dateOffSetCenter = int($circleRadius/2);
+    my $dateX = $clockCenterFromCenterX;
+    my $dateY = $clockCenterFromCenterY - $dateOffSetCenter;
+
+    # Velikost kazalcev
+    my $kazalecDolzinaSecond = int($circleRadius*0.75);
+    my $kazalecDolzinaMinute = int($circleRadius*0.75);
+    my $kazalecDolzinaHour   = int($circleRadius*0.6);
+
+    my $scaleLine1      = int($circleRadius*0.85);
+    my $scaleLine2      = int($circleRadius*0.95);
+    my $smallScaleLine1 = int($circleRadius*0.90);
+
+    my $thicknesScaleLine      = int($circleRadius*0.02);
+    my $thicknesSmallScaleLine = int($circleRadius*0.01);
+    my $thicknessCircle        = int($circleRadius*0.04);
+
+    my $smallCircleOffSetEdgeY = $clockCenterY - $kazalecDolzinaSecond;
+
+    # Barve
+
+    my $circleColor       = '#e8ddce';
+    my $circleStrokeColor = '#27284d';
+    my $scaleColor        = '#27284d';
+    my $kazalecColor      = '#27284d';
+    my $secentColor       = '#a53e4f';
+
+    ##### Izdelava ozadja ure #####
+
+    $fixedClockLayer->Draw(
+        fill        => $circleColor,
+        stroke      => $circleStrokeColor,
+        strokewidth => $thicknessCircle,
+        points      => "$clockCenterX,$clockCenterY $circleOffSetEdgeX,$circleOffSetEdgeY",
+        primitive   => 'circle');
+
+
+    # črtice med številkami na uri
+    my @smallScaleLine = (2,3,4,5,6,7,8,9,10,11,12,13);
+
+    for(my $i=0; $i < 4; $i++){
+
+        for(my $j=0; $j < 12; $j++){
+
+            my $smallScaleLineN = $smallScaleLine[$j] + $i*15; 
+
+            if($smallScaleLineN % 5 == 0){
+
+                my $scaleLineY1 = $clockCenterY - int(sin(pi/2-($smallScaleLineN*pi/30))*$scaleLine1);
+                my $scaleLineX1 = $clockCenterX + int(cos(pi/2-($smallScaleLineN*pi/30))*$scaleLine1);
+
+                my $scaleLineY2 = $clockCenterY - int(sin(pi/2-($smallScaleLineN*pi/30))*$scaleLine2);
+                my $scaleLineX2 = $clockCenterX + int(cos(pi/2-($smallScaleLineN*pi/30))*$scaleLine2);
+
+                $fixedClockLayer->Draw(
+                    fill        => $scaleColor,
+                    stroke      => $scaleColor,
+                    points      => "$scaleLineX1,$scaleLineY1 $scaleLineX2,$scaleLineY2", # kordinate točk x1, y1, x2, y1
+                    strokewidth => $thicknesScaleLine,
+                    primitive   => 'line');
+
+            }else{
+
+                my $smallScaleLineY1 = $clockCenterY - int(sin(pi/2-($smallScaleLineN*pi/30))*$smallScaleLine1);
+                my $smallScaleLineX1 = $clockCenterX + int(cos(pi/2-($smallScaleLineN*pi/30))*$smallScaleLine1);
+                
+                my $scaleLineY2 = $clockCenterY - int(sin(pi/2-($smallScaleLineN*pi/30))*$scaleLine2);
+                my $scaleLineX2 = $clockCenterX + int(cos(pi/2-($smallScaleLineN*pi/30))*$scaleLine2);
+
+                $fixedClockLayer->Draw(
+                    fill        => $scaleColor,
+                    stroke      => $scaleColor,
+                    points      => "$smallScaleLineX1,$smallScaleLineY1 $scaleLineX2,$scaleLineY2", # kordinate točk x1, y1, x2, y1
+                    strokewidth => $thicknesSmallScaleLine,
+                    primitive   => 'line');
+            }
+        }
+    }
+    # Številke na uri
+
+    my $font = $circleRadius*0.2;
+    if($font eq ""){$font = int($circleRadius*0.2)}
+
+    $fixedClockLayer->Annotate(
+        fill      => $scaleColor,
+        font      => '/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf',
+        pointsize => $font,
+        geometry  => "-$number12X-$number12Y",
+        gravity   => 'center',
+        text      => "12");
+
+    $fixedClockLayer->Annotate(
+        fill      => $scaleColor,
+        font      => '/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf',
+        pointsize => $font,
+        geometry  => "-$number3X-$number3Y",
+        gravity   => 'center',
+        text      => "3");
+
+    $fixedClockLayer->Annotate(
+        fill      => $scaleColor,
+        font      => '/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf',
+        pointsize => $font,
+        geometry  => "-$number6X-$number6Y",
+        gravity   => 'center',
+        text      => "6");
+
+    $fixedClockLayer->Annotate(
+        fill      => $scaleColor,
+        font      => '/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf',
+        pointsize => $font,
+        geometry  => "-$number9X-$number9Y",
+        gravity   => 'center',
+        text      => "9");
+
+
+    print"fixed clock layer generiran\n";
+
+    $fixedClockLayer->Write('top_layer/fixed_clock_layer.png');
+
+
+    ##### KAZALCI IN DATUM #####
+
+    my $second;
+    my $minute;
+    my $minuteL = "0";
+    my $hour;
+    my $hourL   = "0";
+    my $date;
+    my $dateL   = "0";
+
+    my @kazalecSecondY;
+    my @kazalecSecondX;
+    my $SecondY;
+    my $SecondX;
+    my $thicknessSecond = int($circleRadius*0.02);
+    my $kazalecSecendCircle = $clockCenterY - int($circleRadius*0.06);
+
+    my @kazalecMinuteY;
+    my @kazalecMinuteX;
+    my $MinuteY;
+    my $MinuteX;
+    my $thicknessMinute = int($circleRadius*0.04);
+
+    my @kazalecHourY;
+    my @kazalecHourX;
+    my $HourY;
+    my $HourX;
+    my $thicknessHour = int($circleRadius*0.06);
+
+    my $activeLayer = Image::Magick->new();
+    $activeLayer->Read("top_layer/fixed_clock_layer.png");
+
+    for(my $s=0; $s <= 720; $s++){
+        push(@kazalecSecondY, ($clockCenterY  - int(sin(pi/2-($s*pi/30))*$kazalecDolzinaSecond)));
+        push(@kazalecSecondX, ($clockCenterX  + int(cos(pi/2-($s*pi/30))*$kazalecDolzinaSecond)));
+
+        push(@kazalecMinuteY, ($clockCenterY  - int(sin(pi/2-($s*pi/30))*$kazalecDolzinaMinute)));
+        push(@kazalecMinuteX, ($clockCenterX  + int(cos(pi/2-($s*pi/30))*$kazalecDolzinaMinute)));
+
+        push(@kazalecHourY, ($clockCenterY  - int(sin(pi/2-($s*pi/360))*$kazalecDolzinaHour)));
+        push(@kazalecHourX, ($clockCenterX  + int(cos(pi/2-($s*pi/360))*$kazalecDolzinaHour)));
+    }
+    my $t = 0;
+    while(1){
+
+        $activeLayer->Draw(
+            fill      => $circleColor,
+            points    => "$clockCenterX,$clockCenterY $circleOffSetEdgeX,$smallCircleOffSetEdgeY",
+            primitive => 'circle');    
+
+        # Določanje časovnih spremenljivk
+        $second = strftime "%S", localtime;
+        $minute = strftime "%M", localtime;
+        $hour   = strftime "%I", localtime;
+        $date   = strftime "%F", localtime;
+
+        if($hour==12){$hour=0;}
+
+        $SecondY = $kazalecSecondY[$second];
+        $SecondX = $kazalecSecondX[$second];
+
+        $MinuteY = $kazalecMinuteY[$minute];
+        $MinuteX = $kazalecMinuteX[$minute];
+
+        $HourY   = $kazalecHourY[$hour*60+$minute];
+        $HourX   = $kazalecHourX[$hour*60+$minute];
+
+        # DATUM
+        $activeLayer->Annotate(
+            fill      => $scaleColor,
+            font      => '/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf',
+            pointsize => $font,
+            geometry  => "-$dateX-$dateY",
+            gravity   => 'center',
+            text      => "$date");
+
+        # Urni kazalec
+        $activeLayer->Draw(
+            fill        => $kazalecColor,
+            stroke      => $kazalecColor,
+            points      => "$clockCenterX,$clockCenterY $HourX,$HourY",
+            strokewidth => $thicknessHour,
+            primitive   => 'line');
+
+        # Minutni kazalec
+        $activeLayer->Draw(
+            fill        => $kazalecColor,
+            stroke      => $kazalecColor,
+            points      => "$clockCenterX,$clockCenterY $MinuteX,$MinuteY",
+            strokewidth => $thicknessMinute,
+            primitive   => 'line');
+        
+
+        # Sekundni kazalec
+        $activeLayer->Draw(
+            fill        => $secentColor,
+            stroke      => $secentColor,
+            points      => "$clockCenterX,$clockCenterY $SecondX,$SecondY",
+            strokewidth => $thicknessSecond,
+            primitive   => 'line');
+
+        $activeLayer->Draw(
+            fill      => $secentColor,
+            points    => "$clockCenterX,$clockCenterY $clockCenterX,$kazalecSecendCircle",
+            primitive => 'circle');
+
+
+        $activeLayer->Write('top_layer/active_layer1.png');
+
+    # Premaknemo active_layer1.png v active_layer.png
+        move('top_layer/active_layer1.png', 'top_layer/active_layer.png');
+        
+        $t = time();
+        while(time() == $t){}
+        
+    }
+}
 
 1;
