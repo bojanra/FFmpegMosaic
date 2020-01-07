@@ -648,9 +648,9 @@ sub buildTlay {
             my $msgFontSize        = 30;
             my $msgRowBottomOffset = 0;
             my $msgRowHight        = int($msgFontSize*$fontScaleY + $msgRowBottomOffset);
-                my @BR = ("2,56 Mb", "2,56 Mb", "2,56 Mb");
-                my @MC = ("239.239.100.100", "239.239.100.200", "239.239.100.300");
-                my @CC = (">56001", ">56002", ">56003");
+                my @BR = ("2,56 Mb", "2,56 Mb", "2,56 Mb", "2,56 Mb", "2,56 Mb");
+                my @MC = ("239.239.100.100", "239.239.100.200", "239.239.100.300", "239.239.100.200", "239.239.100.300");
+                my @CC = (">56001", ">56002", ">56003", ">56002", ">56003");
             my $msgX  = $videoFramePositionX;
             my $msgY  = $videoFramePositionY + $videoFrameHeight - $msgRowHight;
             my $msgX2 = $msgX+$videoFrameWidth;
@@ -742,284 +742,282 @@ sub buildTlay {
     my $fixedClockLayer = Image::Magick->new();
     $fixedClockLayer->Read('top_layer/upper_layer.png');
 
-    my $x;
-    my $y;
-    my $width;
-    my $height;
+        foreach my $frame ( @{ $self->{output}{frameList} } ) {
+            if($frame->{serviceId} eq "clock"){
+                my $x      = $frame->{position}{x};
+                my $y      = $frame->{position}{y};
+                my $width  = $frame->{size}{width};
+                my $height = $frame->{size}{height};
+            
 
-    foreach my $frame ( @{ $self->{output}{frameList} } ) {
-        if($frame->{serviceId} eq "clock"){
-            $x      = $frame->{position}{x};
-            $y      = $frame->{position}{y};
-            $width  = $frame->{size}{width};
-            $height = $frame->{size}{height};
-        }
-    }
+                print "$x, $y, $width, $height\n";
 
-    print "$x, $y, $width, $height\n";
+                # Urino središče
+                my $clockCenterX = int($x + $width/2);
+                my $clockCenterY = int($y + $height/2);
 
-    # Urino središče
-    my $clockCenterX = int($x + $width/2);
-    my $clockCenterY = int($y + $height/2);
+                # Krog
+                my $circleRadius = $height*0.9/2;
+                my $circleX      = $clockCenterX ;
+                my $circleY      = $clockCenterY;
+                my $circleOffSetEdgeX = $clockCenterX;
+                my $circleOffSetEdgeY = $clockCenterY - $circleRadius;
 
-    # Krog
-    my $circleRadius = $height*0.9/2;
-    my $circleX      = $clockCenterX ;
-    my $circleY      = $clockCenterY;
-    my $circleOffSetEdgeX = $clockCenterX;
-    my $circleOffSetEdgeY = $clockCenterY - $circleRadius;
+                # Pozicija številk
+                my $clockCenterFromCenterX = int(1920/2 - $clockCenterX);
+                my $clockCenterFromCenterY = int(1080/2 - $clockCenterY);
 
-    # Pozicija številk
-    my $clockCenterFromCenterX = int(1920/2 - $clockCenterX);
-    my $clockCenterFromCenterY = int(1080/2 - $clockCenterY);
+                my $numberOffSetCenter = $circleRadius*0.85;
 
-    my $numberOffSetCenter = $circleRadius*0.85;
+                my $number12X = $clockCenterFromCenterX;
+                my $number12Y = $clockCenterFromCenterY + $numberOffSetCenter;
+                my $number3X  = $clockCenterFromCenterX - $numberOffSetCenter;
+                my $number3Y  = $clockCenterFromCenterY;
+                my $number6X  = $clockCenterFromCenterX;
+                my $number6Y  = $clockCenterFromCenterY - $numberOffSetCenter;
+                my $number9X  = $clockCenterFromCenterX + $numberOffSetCenter;
+                my $number9Y  = $clockCenterFromCenterY;
 
-    my $number12X = $clockCenterFromCenterX;
-    my $number12Y = $clockCenterFromCenterY + $numberOffSetCenter;
-    my $number3X  = $clockCenterFromCenterX - $numberOffSetCenter;
-    my $number3Y  = $clockCenterFromCenterY;
-    my $number6X  = $clockCenterFromCenterX;
-    my $number6Y  = $clockCenterFromCenterY - $numberOffSetCenter;
-    my $number9X  = $clockCenterFromCenterX + $numberOffSetCenter;
-    my $number9Y  = $clockCenterFromCenterY;
+                # Pozicija datuma
+                my $dateOffSetCenter = int($circleRadius/2);
+                my $dateX = $clockCenterFromCenterX;
+                my $dateY = $clockCenterFromCenterY - $dateOffSetCenter;
 
-    # Pozicija datuma
-    my $dateOffSetCenter = int($circleRadius/2);
-    my $dateX = $clockCenterFromCenterX;
-    my $dateY = $clockCenterFromCenterY - $dateOffSetCenter;
+                # Velikost kazalcev
+                my $kazalecDolzinaSecond = int($circleRadius*0.75);
+                my $kazalecDolzinaMinute = int($circleRadius*0.75);
+                my $kazalecDolzinaHour   = int($circleRadius*0.6);
 
-    # Velikost kazalcev
-    my $kazalecDolzinaSecond = int($circleRadius*0.75);
-    my $kazalecDolzinaMinute = int($circleRadius*0.75);
-    my $kazalecDolzinaHour   = int($circleRadius*0.6);
+                my $scaleLine1      = int($circleRadius*0.85);
+                my $scaleLine2      = int($circleRadius*0.95);
+                my $smallScaleLine1 = int($circleRadius*0.90);
 
-    my $scaleLine1      = int($circleRadius*0.85);
-    my $scaleLine2      = int($circleRadius*0.95);
-    my $smallScaleLine1 = int($circleRadius*0.90);
+                my $thicknesScaleLine      = int($circleRadius*0.02);
+                my $thicknesSmallScaleLine = int($circleRadius*0.01);
+                my $thicknessCircle        = int($circleRadius*0.04);
 
-    my $thicknesScaleLine      = int($circleRadius*0.02);
-    my $thicknesSmallScaleLine = int($circleRadius*0.01);
-    my $thicknessCircle        = int($circleRadius*0.04);
+                my $smallCircleOffSetEdgeY = $clockCenterY - $kazalecDolzinaSecond;
 
-    my $smallCircleOffSetEdgeY = $clockCenterY - $kazalecDolzinaSecond;
+                # Barve
 
-    # Barve
+                my $circleColor       = '#e8ddce';
+                my $circleStrokeColor = '#27284d';
+                my $scaleColor        = '#27284d';
+                my $kazalecColor      = '#27284d';
+                my $secentColor       = '#a53e4f';
 
-    my $circleColor       = '#e8ddce';
-    my $circleStrokeColor = '#27284d';
-    my $scaleColor        = '#27284d';
-    my $kazalecColor      = '#27284d';
-    my $secentColor       = '#a53e4f';
-
-    ##### Izdelava ozadja ure #####
-
-    $fixedClockLayer->Draw(
-        fill        => $circleColor,
-        stroke      => $circleStrokeColor,
-        strokewidth => $thicknessCircle,
-        points      => "$clockCenterX,$clockCenterY $circleOffSetEdgeX,$circleOffSetEdgeY",
-        primitive   => 'circle');
-
-
-    # črtice med številkami na uri
-    my @smallScaleLine = (2,3,4,5,6,7,8,9,10,11,12,13);
-
-    for(my $i=0; $i < 4; $i++){
-
-        for(my $j=0; $j < 12; $j++){
-
-            my $smallScaleLineN = $smallScaleLine[$j] + $i*15; 
-
-            if($smallScaleLineN % 5 == 0){
-
-                my $scaleLineY1 = $clockCenterY - int(sin(pi/2-($smallScaleLineN*pi/30))*$scaleLine1);
-                my $scaleLineX1 = $clockCenterX + int(cos(pi/2-($smallScaleLineN*pi/30))*$scaleLine1);
-
-                my $scaleLineY2 = $clockCenterY - int(sin(pi/2-($smallScaleLineN*pi/30))*$scaleLine2);
-                my $scaleLineX2 = $clockCenterX + int(cos(pi/2-($smallScaleLineN*pi/30))*$scaleLine2);
+                ##### Izdelava ozadja ure #####
 
                 $fixedClockLayer->Draw(
-                    fill        => $scaleColor,
-                    stroke      => $scaleColor,
-                    points      => "$scaleLineX1,$scaleLineY1 $scaleLineX2,$scaleLineY2", # kordinate točk x1, y1, x2, y1
-                    strokewidth => $thicknesScaleLine,
-                    primitive   => 'line');
+                    fill        => $circleColor,
+                    stroke      => $circleStrokeColor,
+                    strokewidth => $thicknessCircle,
+                    points      => "$clockCenterX,$clockCenterY $circleOffSetEdgeX,$circleOffSetEdgeY",
+                    primitive   => 'circle');
 
-            }else{
 
-                my $smallScaleLineY1 = $clockCenterY - int(sin(pi/2-($smallScaleLineN*pi/30))*$smallScaleLine1);
-                my $smallScaleLineX1 = $clockCenterX + int(cos(pi/2-($smallScaleLineN*pi/30))*$smallScaleLine1);
-                
-                my $scaleLineY2 = $clockCenterY - int(sin(pi/2-($smallScaleLineN*pi/30))*$scaleLine2);
-                my $scaleLineX2 = $clockCenterX + int(cos(pi/2-($smallScaleLineN*pi/30))*$scaleLine2);
+                # črtice med številkami na uri
+                my @smallScaleLine = (2,3,4,5,6,7,8,9,10,11,12,13);
 
-                $fixedClockLayer->Draw(
-                    fill        => $scaleColor,
-                    stroke      => $scaleColor,
-                    points      => "$smallScaleLineX1,$smallScaleLineY1 $scaleLineX2,$scaleLineY2", # kordinate točk x1, y1, x2, y1
-                    strokewidth => $thicknesSmallScaleLine,
-                    primitive   => 'line');
+                for(my $i=0; $i < 4; $i++){
+
+                    for(my $j=0; $j < 12; $j++){
+
+                        my $smallScaleLineN = $smallScaleLine[$j] + $i*15; 
+
+                        if($smallScaleLineN % 5 == 0){
+
+                            my $scaleLineY1 = $clockCenterY - int(sin(pi/2-($smallScaleLineN*pi/30))*$scaleLine1);
+                            my $scaleLineX1 = $clockCenterX + int(cos(pi/2-($smallScaleLineN*pi/30))*$scaleLine1);
+
+                            my $scaleLineY2 = $clockCenterY - int(sin(pi/2-($smallScaleLineN*pi/30))*$scaleLine2);
+                            my $scaleLineX2 = $clockCenterX + int(cos(pi/2-($smallScaleLineN*pi/30))*$scaleLine2);
+
+                            $fixedClockLayer->Draw(
+                                fill        => $scaleColor,
+                                stroke      => $scaleColor,
+                                points      => "$scaleLineX1,$scaleLineY1 $scaleLineX2,$scaleLineY2", # kordinate točk x1, y1, x2, y1
+                                strokewidth => $thicknesScaleLine,
+                                primitive   => 'line');
+
+                        }else{
+
+                            my $smallScaleLineY1 = $clockCenterY - int(sin(pi/2-($smallScaleLineN*pi/30))*$smallScaleLine1);
+                            my $smallScaleLineX1 = $clockCenterX + int(cos(pi/2-($smallScaleLineN*pi/30))*$smallScaleLine1);
+                            
+                            my $scaleLineY2 = $clockCenterY - int(sin(pi/2-($smallScaleLineN*pi/30))*$scaleLine2);
+                            my $scaleLineX2 = $clockCenterX + int(cos(pi/2-($smallScaleLineN*pi/30))*$scaleLine2);
+
+                            $fixedClockLayer->Draw(
+                                fill        => $scaleColor,
+                                stroke      => $scaleColor,
+                                points      => "$smallScaleLineX1,$smallScaleLineY1 $scaleLineX2,$scaleLineY2", # kordinate točk x1, y1, x2, y1
+                                strokewidth => $thicknesSmallScaleLine,
+                                primitive   => 'line');
+                        }
+                    }
+                }
+                # Številke na uri
+
+                my $font = $circleRadius*0.2;
+                if($font eq ""){$font = int($circleRadius*0.2)}
+
+                $fixedClockLayer->Annotate(
+                    fill      => $scaleColor,
+                    font      => '/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf',
+                    pointsize => $font,
+                    geometry  => "-$number12X-$number12Y",
+                    gravity   => 'center',
+                    text      => "12");
+
+                $fixedClockLayer->Annotate(
+                    fill      => $scaleColor,
+                    font      => '/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf',
+                    pointsize => $font,
+                    geometry  => "-$number3X-$number3Y",
+                    gravity   => 'center',
+                    text      => "3");
+
+                $fixedClockLayer->Annotate(
+                    fill      => $scaleColor,
+                    font      => '/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf',
+                    pointsize => $font,
+                    geometry  => "-$number6X-$number6Y",
+                    gravity   => 'center',
+                    text      => "6");
+
+                $fixedClockLayer->Annotate(
+                    fill      => $scaleColor,
+                    font      => '/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf',
+                    pointsize => $font,
+                    geometry  => "-$number9X-$number9Y",
+                    gravity   => 'center',
+                    text      => "9");
+
+
+                print"fixed clock layer generiran\n";
+
+                $fixedClockLayer->Write('top_layer/fixed_clock_layer.png');
+
+
+                ##### KAZALCI IN DATUM #####
+
+                my $second;
+                my $minute;
+                my $minuteL = "0";
+                my $hour;
+                my $hourL   = "0";
+                my $date;
+                my $dateL   = "0";
+
+                my @kazalecSecondY;
+                my @kazalecSecondX;
+                my $SecondY;
+                my $SecondX;
+                my $thicknessSecond = int($circleRadius*0.02);
+                my $kazalecSecendCircle = $clockCenterY - int($circleRadius*0.06);
+
+                my @kazalecMinuteY;
+                my @kazalecMinuteX;
+                my $MinuteY;
+                my $MinuteX;
+                my $thicknessMinute = int($circleRadius*0.04);
+
+                my @kazalecHourY;
+                my @kazalecHourX;
+                my $HourY;
+                my $HourX;
+                my $thicknessHour = int($circleRadius*0.06);
+
+                my $activeLayer = Image::Magick->new();
+                $activeLayer->Read("top_layer/fixed_clock_layer.png");
+
+                for(my $s=0; $s <= 720; $s++){
+                    push(@kazalecSecondY, ($clockCenterY  - int(sin(pi/2-($s*pi/30))*$kazalecDolzinaSecond)));
+                    push(@kazalecSecondX, ($clockCenterX  + int(cos(pi/2-($s*pi/30))*$kazalecDolzinaSecond)));
+
+                    push(@kazalecMinuteY, ($clockCenterY  - int(sin(pi/2-($s*pi/30))*$kazalecDolzinaMinute)));
+                    push(@kazalecMinuteX, ($clockCenterX  + int(cos(pi/2-($s*pi/30))*$kazalecDolzinaMinute)));
+
+                    push(@kazalecHourY, ($clockCenterY  - int(sin(pi/2-($s*pi/360))*$kazalecDolzinaHour)));
+                    push(@kazalecHourX, ($clockCenterX  + int(cos(pi/2-($s*pi/360))*$kazalecDolzinaHour)));
+                }
+                my $t = 0;
+                while(1){
+
+                    $activeLayer->Draw(
+                        fill      => $circleColor,
+                        points    => "$clockCenterX,$clockCenterY $circleOffSetEdgeX,$smallCircleOffSetEdgeY",
+                        primitive => 'circle');    
+
+                    # Določanje časovnih spremenljivk
+                    $second = strftime "%S", localtime;
+                    $minute = strftime "%M", localtime;
+                    $hour   = strftime "%I", localtime;
+                    $date   = strftime "%F", localtime;
+
+                    if($hour==12){$hour=0;}
+
+                    $SecondY = $kazalecSecondY[$second];
+                    $SecondX = $kazalecSecondX[$second];
+
+                    $MinuteY = $kazalecMinuteY[$minute];
+                    $MinuteX = $kazalecMinuteX[$minute];
+
+                    $HourY   = $kazalecHourY[$hour*60+$minute];
+                    $HourX   = $kazalecHourX[$hour*60+$minute];
+
+                    # DATUM
+                    $activeLayer->Annotate(
+                        fill      => $scaleColor,
+                        font      => '/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf',
+                        pointsize => $font,
+                        geometry  => "-$dateX-$dateY",
+                        gravity   => 'center',
+                        text      => "$date");
+
+                    # Urni kazalec
+                    $activeLayer->Draw(
+                        fill        => $kazalecColor,
+                        stroke      => $kazalecColor,
+                        points      => "$clockCenterX,$clockCenterY $HourX,$HourY",
+                        strokewidth => $thicknessHour,
+                        primitive   => 'line');
+
+                    # Minutni kazalec
+                    $activeLayer->Draw(
+                        fill        => $kazalecColor,
+                        stroke      => $kazalecColor,
+                        points      => "$clockCenterX,$clockCenterY $MinuteX,$MinuteY",
+                        strokewidth => $thicknessMinute,
+                        primitive   => 'line');
+                    
+
+                    # Sekundni kazalec
+                    $activeLayer->Draw(
+                        fill        => $secentColor,
+                        stroke      => $secentColor,
+                        points      => "$clockCenterX,$clockCenterY $SecondX,$SecondY",
+                        strokewidth => $thicknessSecond,
+                        primitive   => 'line');
+
+                    $activeLayer->Draw(
+                        fill      => $secentColor,
+                        points    => "$clockCenterX,$clockCenterY $clockCenterX,$kazalecSecendCircle",
+                        primitive => 'circle');
+
+
+                    $activeLayer->Write('top_layer/active_layer1.png');
+                    # Premaknemo active_layer1.png v active_layer.png
+                    move('top_layer/active_layer1.png', 'top_layer/active_layer.png');
+                                
+                    my $t = time();
+                    while(time() == $t){}
             }
+        }else{
+            $fixedClockLayer->Write('top_layer/active_layer1.png');
+            move('top_layer/active_layer1.png', 'top_layer/active_layer.png');
         }
-    }
-    # Številke na uri
-
-    my $font = $circleRadius*0.2;
-    if($font eq ""){$font = int($circleRadius*0.2)}
-
-    $fixedClockLayer->Annotate(
-        fill      => $scaleColor,
-        font      => '/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf',
-        pointsize => $font,
-        geometry  => "-$number12X-$number12Y",
-        gravity   => 'center',
-        text      => "12");
-
-    $fixedClockLayer->Annotate(
-        fill      => $scaleColor,
-        font      => '/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf',
-        pointsize => $font,
-        geometry  => "-$number3X-$number3Y",
-        gravity   => 'center',
-        text      => "3");
-
-    $fixedClockLayer->Annotate(
-        fill      => $scaleColor,
-        font      => '/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf',
-        pointsize => $font,
-        geometry  => "-$number6X-$number6Y",
-        gravity   => 'center',
-        text      => "6");
-
-    $fixedClockLayer->Annotate(
-        fill      => $scaleColor,
-        font      => '/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf',
-        pointsize => $font,
-        geometry  => "-$number9X-$number9Y",
-        gravity   => 'center',
-        text      => "9");
-
-
-    print"fixed clock layer generiran\n";
-
-    $fixedClockLayer->Write('top_layer/fixed_clock_layer.png');
-
-
-    ##### KAZALCI IN DATUM #####
-
-    my $second;
-    my $minute;
-    my $minuteL = "0";
-    my $hour;
-    my $hourL   = "0";
-    my $date;
-    my $dateL   = "0";
-
-    my @kazalecSecondY;
-    my @kazalecSecondX;
-    my $SecondY;
-    my $SecondX;
-    my $thicknessSecond = int($circleRadius*0.02);
-    my $kazalecSecendCircle = $clockCenterY - int($circleRadius*0.06);
-
-    my @kazalecMinuteY;
-    my @kazalecMinuteX;
-    my $MinuteY;
-    my $MinuteX;
-    my $thicknessMinute = int($circleRadius*0.04);
-
-    my @kazalecHourY;
-    my @kazalecHourX;
-    my $HourY;
-    my $HourX;
-    my $thicknessHour = int($circleRadius*0.06);
-
-    my $activeLayer = Image::Magick->new();
-    $activeLayer->Read("top_layer/fixed_clock_layer.png");
-
-    for(my $s=0; $s <= 720; $s++){
-        push(@kazalecSecondY, ($clockCenterY  - int(sin(pi/2-($s*pi/30))*$kazalecDolzinaSecond)));
-        push(@kazalecSecondX, ($clockCenterX  + int(cos(pi/2-($s*pi/30))*$kazalecDolzinaSecond)));
-
-        push(@kazalecMinuteY, ($clockCenterY  - int(sin(pi/2-($s*pi/30))*$kazalecDolzinaMinute)));
-        push(@kazalecMinuteX, ($clockCenterX  + int(cos(pi/2-($s*pi/30))*$kazalecDolzinaMinute)));
-
-        push(@kazalecHourY, ($clockCenterY  - int(sin(pi/2-($s*pi/360))*$kazalecDolzinaHour)));
-        push(@kazalecHourX, ($clockCenterX  + int(cos(pi/2-($s*pi/360))*$kazalecDolzinaHour)));
-    }
-    my $t = 0;
-    while(1){
-
-        $activeLayer->Draw(
-            fill      => $circleColor,
-            points    => "$clockCenterX,$clockCenterY $circleOffSetEdgeX,$smallCircleOffSetEdgeY",
-            primitive => 'circle');    
-
-        # Določanje časovnih spremenljivk
-        $second = strftime "%S", localtime;
-        $minute = strftime "%M", localtime;
-        $hour   = strftime "%I", localtime;
-        $date   = strftime "%F", localtime;
-
-        if($hour==12){$hour=0;}
-
-        $SecondY = $kazalecSecondY[$second];
-        $SecondX = $kazalecSecondX[$second];
-
-        $MinuteY = $kazalecMinuteY[$minute];
-        $MinuteX = $kazalecMinuteX[$minute];
-
-        $HourY   = $kazalecHourY[$hour*60+$minute];
-        $HourX   = $kazalecHourX[$hour*60+$minute];
-
-        # DATUM
-        $activeLayer->Annotate(
-            fill      => $scaleColor,
-            font      => '/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf',
-            pointsize => $font,
-            geometry  => "-$dateX-$dateY",
-            gravity   => 'center',
-            text      => "$date");
-
-        # Urni kazalec
-        $activeLayer->Draw(
-            fill        => $kazalecColor,
-            stroke      => $kazalecColor,
-            points      => "$clockCenterX,$clockCenterY $HourX,$HourY",
-            strokewidth => $thicknessHour,
-            primitive   => 'line');
-
-        # Minutni kazalec
-        $activeLayer->Draw(
-            fill        => $kazalecColor,
-            stroke      => $kazalecColor,
-            points      => "$clockCenterX,$clockCenterY $MinuteX,$MinuteY",
-            strokewidth => $thicknessMinute,
-            primitive   => 'line');
-        
-
-        # Sekundni kazalec
-        $activeLayer->Draw(
-            fill        => $secentColor,
-            stroke      => $secentColor,
-            points      => "$clockCenterX,$clockCenterY $SecondX,$SecondY",
-            strokewidth => $thicknessSecond,
-            primitive   => 'line');
-
-        $activeLayer->Draw(
-            fill      => $secentColor,
-            points    => "$clockCenterX,$clockCenterY $clockCenterX,$kazalecSecendCircle",
-            primitive => 'circle');
-
-
-        $activeLayer->Write('top_layer/active_layer1.png');
-
-    # Premaknemo active_layer1.png v active_layer.png
-        move('top_layer/active_layer1.png', 'top_layer/active_layer.png');
-        
-        $t = time();
-        while(time() == $t){}
         
     }
 }
