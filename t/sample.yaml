@@ -16,12 +16,12 @@ service:
     source: multicast2
     video: 0
     audio: 0
-    audio1: 1
   mm:
     name: TV SLO 2
     source: multicast1
     video: 0
     audio: 0
+    audio1: 1
   test:
     name: Koper
     source: nekaj

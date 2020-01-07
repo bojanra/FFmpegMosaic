@@ -480,7 +480,7 @@ sub buildCmd {
 
     my @cmd = ();
 
-    push( @cmd, "#!/bin/bash \n \n ffmpegX -y -re" );
+    push( @cmd, "#!/bin/bash \n\n ffmpegX -y -re" );
 
     # sources
     foreach my $source ( @{ $self->{output}{sourceList} } ) {
@@ -488,10 +488,7 @@ sub buildCmd {
     }
 
     my $topLayerInput = $self->config->{output}{topLayer};
-    
-    #print $topLayerInput;
-
-    push( @cmd, "-loop 1 -f image2 -r 25 -i \' $topLayerInput \' \\ \n" );
+    push( @cmd, "-loop 1 -f image2 -r 25 -i \'$topLayerInput\' \\\n" );
 
     # map
     my $input = 0;
@@ -508,11 +505,11 @@ sub buildCmd {
         $input++;
     }
     push( @cmd, "-map ". $input .":v");
-    push( @cmd, "\\ \n-filter_complex");
+    push( @cmd, "\\\n-filter_complex");
     
 
     # imput scale
-    push( @cmd, "\" \\ \nnullsrc=1920x1080, lutrgb=126:126:126 [base];");
+    push( @cmd, "\" \\\nnullsrc=1920x1080, lutrgb=126:126:126 [base];");
 
     $input = 0;
 
@@ -520,60 +517,72 @@ sub buildCmd {
         if($frame->{serviceId} ne "clock"){
             my $scale;
             my $service = $frame->{serviceId};
+            my $source = $self->{service}{$service}{source};
             
             my $id     = $self->{service}{$service}{video};
             my $tag    = 'v';
             my $width  = $frame->{size}{width};
             my $height = $frame->{size}{height};
 
-            $scale = "\\ \n[$input:$tag:$id] setpts=PTS-STARTPTS, scale=".$width."x".$height." [$input:v]; ";
+            $scale = "\\\n[$source:$tag:$id] setpts=PTS-STARTPTS, scale=".$width."x".$height." [$source:v]; ";
             
             push( @cmd, $scale );
 
             foreach my $component ( 'audio', 'audio1') {
                 next if ! exists $self->{service}{$service}{$component};
+                
                 $id  = $self->{service}{$service}{$component};
                 $tag = 'a';
                 my $audioWidth  = $frame->{audioSize}{width};
                 my $audioHeight = $frame->{audioSize}{height};
 
-                $scale = "\\ \n[$input:$tag:$id] showvolume=f=0.5:c=0x00ffff:b=4:w=$audioHeight:h=$audioWidth:o=v:ds=log:dm=2:p=1, format=yuv420p [$input:a];";
+                $scale = "\\\n[$source:$tag:$id] showvolume=f=0.5:c=0x00ffff:b=4:w=$audioHeight:h=$audioWidth:o=v:ds=log:dm=2:p=1, format=yuv420p [$source.$id:a];";
                 
                 push( @cmd, $scale );
             }
             $input++;
         }
     } 
-    push( @cmd, "\\ \n[". $input .":v] setpts=PTS-STARTPTS, scale=1920x1080 [topLayer]; " );
+    push( @cmd, "\\\n[". $input .":v] setpts=PTS-STARTPTS, scale=1920x1080 [topLayer]; " );
 
     # parameters
-    push( @cmd, "\\ \n[base]" );
+    push( @cmd, "\\\n[base]" );
     
     $input = 0;
     foreach my $frame ( @{ $self->{output}{frameList} } ) {
         if($frame->{serviceId} ne "clock"){
             my $parameter;
+            my $service = $frame->{serviceId};
+            my $source = $self->{service}{$service}{source};
 
             my $x   = $frame->{position}{x};
             my $y   = $frame->{position}{y};
-            $parameter = "\\ \n[$input:v] overlay=shortest=1: x=$x: y=$y";
+            $parameter = "\\\n[$source:v] overlay=shortest=1: x=$x: y=$y";
 
             push( @cmd, $parameter );
 
-            my $audiox = $frame->{audioPosition}{x};
-            my $audioy = $frame->{audioPosition}{y};
-            $parameter = "[$input:videoLayer]; [$input:videoLayer][$input:a] overlay=shortest=1:x=$audiox: y=$audioy [$input:layer]; [$input:layer]";
-            
-            push( @cmd, $parameter );
+            my $audioN = 0;
+            foreach my $component ( 'audio1', 'audio') {
+                
+                next if ! exists $self->{service}{$service}{$component};
+                my $id  = $self->{service}{$service}{$component};
+                my $audioWidth  = $frame->{audioSize}{width};
+                my $audioHeight = $frame->{audioSize}{height};
 
-            $input++;
+                my $audiox = $frame->{audioPosition}{x} - ($audioWidth*2+6)*$audioN;
+                my $audioy = $frame->{audioPosition}{y};
+                $parameter = "[$source.$id:layer]; [$source.$id:layer][$source.$id:a] overlay=shortest=1:x=$audiox: y=$audioy ";
+                
+                push( @cmd, $parameter );
+                $audioN++;
+            }
+            push( @cmd, "[$source:layer]; [$source:layer]" );
         }
     }
 
-    push( @cmd, "\\ \n[topLayer] overlay=shortest=1: x=0: y=0 \"" );
+    push( @cmd, "\\\n[topLayer] overlay=shortest=1: x=0: y=0\"" );
 
-    push( @cmd, "\\ \n-strict experimental -vcodec libx264 -b:v 4M -minrate 3M -maxrate 3M -bufsize 6M -preset ultrafast  -profile:v high -level 4.0 -an -threads 0 \\
-    -f segment -segment_list /var/www/html/playlist.m3u8 -segment_list_flags +live -segment_time 10 /var/www/html/out%03d.ts");
+    push( @cmd, " \\\n-strict experimental -vcodec libx264 -b:v 4M -minrate 3M -maxrate 3M -bufsize 6M -preset ultrafast  -profile:v high -level 4.0 -an -threads 0 \\\n-f mpegts udp://172.30.1.41:5000?pkt_size=1316");
 
 # -f mpegts udp://172.30.1.41:5000?pkt_size=1316");
 # -f segment -segment_list /var/www/html/playlist.m3u8 -segment_list_flags +live -segment_time 10 /var/www/html/out%03d.ts");
