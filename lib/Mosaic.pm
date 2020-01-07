@@ -223,6 +223,9 @@ sub serviceAdd {
     if ( exists $s->{audio} && exists $s->{video} ) {
         $service->{audio} = $s->{audio};
         $service->{video} = $s->{video};
+        if ( exists $s->{audio1}){
+            $service->{audio1} = $s->{audio1};
+        }
     } else {
         $self->error("no video/audio in service [$serviceId]");
         $errorFlag += 1;
@@ -246,7 +249,6 @@ sub frameAdd {
     $audioHeight = $height-30;
     $audiox      = $x + $width - $audioWidth*2-4;
     $audioy      = $y;
-    
 
     if ( exists $self->{service}{$serviceId} ) {
         my $frame = {
@@ -261,7 +263,7 @@ sub frameAdd {
             },
             audioPosition  => {
                 x => $audiox,
-                y => $audioy
+                y => $audioy,
             },
             audioSize => {
                 width  => $audioWidth,
@@ -482,89 +484,95 @@ sub buildCmd {
 
     # sources
     foreach my $source ( @{ $self->{output}{sourceList} } ) {
-        if($source eq "topLayer"){
-            push( @cmd, "-loop 1 -f image2 -r 25 -i \'". $source->{url} ."\'" );
-        }else{
             push( @cmd, "-i \'". $source->{url} ."\'" );
-        }
     }
+
+    my $topLayerInput = $self->config->{output}{topLayer};
     
+    #print $topLayerInput;
+
+    push( @cmd, "-loop 1 -f image2 -r 25 -i \' $topLayerInput \' \\ \n" );
 
     # map
     my $input = 0;
     foreach my $service ( @{ $self->{output}{serviceList} } ) {
-        my $source = $service->{source};
-
+        next if ! exists $service->{name};
         foreach my $component ( 'video', 'audio', 'audio1') {
-            next if ! exists $self->{service}{$component}; 
-            my $id    = $self->{service}{$component};
-            my $tag   = $component =~ /video/ ? 'v' : 'a';
+            next if ! exists $service->{$component};
+            my $source = $service->{source};
+            my $id  = $service->{$component};
+            my $tag = $component =~ /video/ ? 'v' : 'a';
 
-            push( @cmd, "-map $input:$tag:$id" );
-            $input++;
+            push( @cmd, "-map $source:$tag:$id" );
         }
+        $input++;
     }
-    push( @cmd, "-map ".  @{ $self->{output}{serviceList} } .":v");
-    push( @cmd, "-filter_complex" );
+    push( @cmd, "-map ". $input .":v");
+    push( @cmd, "\\ \n-filter_complex");
     
 
     # imput scale
-    push( @cmd, " \" nullsrc=1920x1080, lutrgb=126:126:126 [base];");
+    push( @cmd, "\" \\ \nnullsrc=1920x1080, lutrgb=126:126:126 [base];");
 
     $input = 0;
 
-    foreach my $frame ( ${ $self->{output}{frameList} }[$input] ) {
-        my $scale;
-        my $service = $frame->{serviceId};
-        
-        my $id     = $self->{service}{$service}{video};
-        say $id;
-        my $tag    = 'v';
-        my $width  = $frame->{size}{width};
-        my $height = $frame->{size}{height};
+    foreach my $frame ( @{ $self->{output}{frameList} } ) {
+        if($frame->{serviceId} ne "clock"){
+            my $scale;
+            my $service = $frame->{serviceId};
+            
+            my $id     = $self->{service}{$service}{video};
+            my $tag    = 'v';
+            my $width  = $frame->{size}{width};
+            my $height = $frame->{size}{height};
 
-        $scale = "[$input:$tag:$id] setpts=PTS-STARTPTS, scale=".$width."x".$height." [$input:v]; ";
-        
-        push( @cmd, $scale );
+            $scale = "\\ \n[$input:$tag:$id] setpts=PTS-STARTPTS, scale=".$width."x".$height." [$input:v]; ";
+            
+            push( @cmd, $scale );
 
-        $id          = $self->{service}{$service}{audio};
-        $tag         = 'a';
-        my $audioWidth  = $frame->{audioSize}{width};
-        my $audioHeight = $frame->{audioSize}{height};
+            foreach my $component ( 'audio', 'audio1') {
+                next if ! exists $self->{service}{$service}{$component};
+                $id  = $self->{service}{$service}{$component};
+                $tag = 'a';
+                my $audioWidth  = $frame->{audioSize}{width};
+                my $audioHeight = $frame->{audioSize}{height};
 
-        $scale = "[$input:$tag:$id] showvolume=f=0.5:c=0x00ffff:b=4:w=$audioHeight:h=$audioWidth:o=v:ds=log:dm=2:p=1, format=yuv420p [$input:a];";
-        
-        push( @cmd, $scale );
-        $input++;
-        
+                $scale = "\\ \n[$input:$tag:$id] showvolume=f=0.5:c=0x00ffff:b=4:w=$audioHeight:h=$audioWidth:o=v:ds=log:dm=2:p=1, format=yuv420p [$input:a];";
+                
+                push( @cmd, $scale );
+            }
+            $input++;
+        }
     } 
-    push( @cmd, "[".@{ $self->{output}{serviceList} }.":v] setpts=PTS-STARTPTS, scale=1920x1080 [topLayer]; " );
+    push( @cmd, "\\ \n[". $input .":v] setpts=PTS-STARTPTS, scale=1920x1080 [topLayer]; " );
 
     # parameters
-    push( @cmd, "[base]" );
+    push( @cmd, "\\ \n[base]" );
     
     $input = 0;
-    foreach my $frame ( ${ $self->{output}{frameList} }[$input] ) {
-        my $parameter;
+    foreach my $frame ( @{ $self->{output}{frameList} } ) {
+        if($frame->{serviceId} ne "clock"){
+            my $parameter;
 
-        my $x   = $frame->{position}{x};
-        my $y   = $frame->{position}{y};
-        $parameter = "[$input:v] overlay=shortest=1: x=$x: y=$y ";
+            my $x   = $frame->{position}{x};
+            my $y   = $frame->{position}{y};
+            $parameter = "\\ \n[$input:v] overlay=shortest=1: x=$x: y=$y";
 
-        push( @cmd, $parameter );
+            push( @cmd, $parameter );
 
-        my $audiox = $frame->{audioPosition}{x};
-        my $audioy = $frame->{audioPosition}{y};
-        $parameter = "[$input:audioLayer]; [$input:audioLayer][$input:a] overlay=shortest=1:x=$audiox: y=$audioy [$input:layer]; [$input:layer]";
-        
-        push( @cmd, $parameter );
+            my $audiox = $frame->{audioPosition}{x};
+            my $audioy = $frame->{audioPosition}{y};
+            $parameter = "[$input:videoLayer]; [$input:videoLayer][$input:a] overlay=shortest=1:x=$audiox: y=$audioy [$input:layer]; [$input:layer]";
+            
+            push( @cmd, $parameter );
 
-        $input++;
+            $input++;
+        }
     }
 
-    push( @cmd, "[topLayer] overlay=shortest=1: x=0: y=0 \"" );
+    push( @cmd, "\\ \n[topLayer] overlay=shortest=1: x=0: y=0 \"" );
 
-    push( @cmd, "-strict experimental -vcodec libx264 -b:v 4M -minrate 3M -maxrate 3M -bufsize 6M -preset ultrafast  -profile:v high -level 4.0 -an -threads 0\\
+    push( @cmd, "\\ \n-strict experimental -vcodec libx264 -b:v 4M -minrate 3M -maxrate 3M -bufsize 6M -preset ultrafast  -profile:v high -level 4.0 -an -threads 0 \\
     -f segment -segment_list /var/www/html/playlist.m3u8 -segment_list_flags +live -segment_time 10 /var/www/html/out%03d.ts");
 
 # -f mpegts udp://172.30.1.41:5000?pkt_size=1316");
@@ -609,104 +617,106 @@ sub buildTlay {
 
     my $input = 0;
 
-    foreach my $frame ( ${ $self->{output}{frameList} }[$input] ) {
+    foreach my $frame ( @{ $self->{output}{frameList} } ) {
+        if($frame->{serviceId} ne "clock"){
 
-        my $titleName              = $frame->{name};
-        my $videoFramePositionX    = $frame->{position}{x};
-        my $videoFramePositionY    = $frame->{position}{y};
-        my $videoFrameWidth        = $frame->{size}{width};
-        my $videoFrameHeight       = $frame->{size}{height};
+            my $titleName              = $frame->{name};
+            my $videoFramePositionX    = $frame->{position}{x};
+            my $videoFramePositionY    = $frame->{position}{y};
+            my $videoFrameWidth        = $frame->{size}{width};
+            my $videoFrameHeight       = $frame->{size}{height};
 
-        # Izračun kordinat
+            # Izračun kordinat
 
-        # TITLE
-        my $titleFontSize     = 30;
-        my $titleRowTopOffset = 10;
-        my $titleOffsetX      = int(($videoFrameWidth - (length($titleName)*$titleFontSize*$fontScaleX))/2);
-        my $titleX            = $videoFramePositionX + $titleOffsetX;
-        my $titleY            = $videoFramePositionY + $titleRowTopOffset;
+            # TITLE
+            my $titleFontSize     = 30;
+            my $titleRowTopOffset = 10;
+            my $titleOffsetX      = int(($videoFrameWidth - (length($titleName)*$titleFontSize*$fontScaleX))/2);
+            my $titleX            = $videoFramePositionX + $titleOffsetX;
+            my $titleY            = $videoFramePositionY + $titleRowTopOffset;
 
-        # MSG
-        my $msgFontSize        = 30;
-        my $msgRowBottomOffset = 0;
-        my $msgRowHight        = int($msgFontSize*$fontScaleY + $msgRowBottomOffset);
-            my $BR = "2,56 Mb";
-            my $MC = "239.239.100.200";
-            my $CC = ">56001";
-        my $msgX  = $videoFramePositionX;
-        my $msgY  = $videoFramePositionY + $videoFrameHeight - $msgRowHight;
-        my $msgX2 = $msgX+$videoFrameWidth;
-        my $msgY2 = $msgY+$msgFontSize;
+            # MSG
+            my $msgFontSize        = 30;
+            my $msgRowBottomOffset = 0;
+            my $msgRowHight        = int($msgFontSize*$fontScaleY + $msgRowBottomOffset);
+                my @BR = ("2,56 Mb", "2,56 Mb", "2,56 Mb");
+                my @MC = ("239.239.100.100", "239.239.100.200", "239.239.100.300");
+                my @CC = (">56001", ">56002", ">56003");
+            my $msgX  = $videoFramePositionX;
+            my $msgY  = $videoFramePositionY + $videoFrameHeight - $msgRowHight;
+            my $msgX2 = $msgX+$videoFrameWidth;
+            my $msgY2 = $msgY+$msgFontSize;
 
-        #ERROR
-        my $errorFontSize = $self->{output}{error}{font};
-        my $errorX1 = $videoFramePositionX;
-        my $errorY1 = $videoFramePositionY;
-        my $errorX2 = $videoFramePositionX+$videoFrameWidth;
-        my $errorY2 = $videoFramePositionY+$videoFrameHeight;
-        my $errorTextX = int((1920-$videoFrameWidth)/2-$videoFramePositionX);
-        my $errorTextY = int((1080-$videoFrameHeight)/2-$videoFramePositionY);
+            #ERROR
+            my $errorFontSize = $self->{output}{error}{font};
+            my $errorX1 = $videoFramePositionX;
+            my $errorY1 = $videoFramePositionY;
+            my $errorX2 = $videoFramePositionX+$videoFrameWidth;
+            my $errorY2 = $videoFramePositionY+$videoFrameHeight;
+            my $errorTextX = int((1920-$videoFrameWidth)/2-$videoFramePositionX);
+            my $errorTextY = int((1080-$videoFrameHeight)/2-$videoFramePositionY);
 
-    # Urejanje ImegeMagic
+        # Urejanje ImegeMagic
 
-        # TITLE
-        $upperLayer->Annotate(
-            undercolor => '#e8ddce',
-            fill       => 'black',
-            font       => '/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf',
-            pointsize  => $titleFontSize,
-            geometry   => "+$titleX+$titleY",
-            gravity    => 'northwest',
-            text       => $titleName);
+            # TITLE
+            $upperLayer->Annotate(
+                undercolor => '#e8ddce',
+                fill       => 'black',
+                font       => '/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf',
+                pointsize  => $titleFontSize,
+                geometry   => "+$titleX+$titleY",
+                gravity    => 'northwest',
+                text       => $titleName);
 
-        # MSG
-        $upperLayer->Draw(
-            fill      => 'white',
-            points    => "$msgX,$msgY $msgX2,$msgY2",
-            gravity   => 'northwest',
-            primitive => 'rectangle');
-
-        $upperLayer->Annotate(
-            fill      => 'black',
-            font      => '/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf',
-            pointsize => $msgFontSize,
-            geometry  => "+$msgX+$msgY",
-            gravity   => 'northwest',
-            text      => "$BR");
-
-        $upperLayer->Annotate(
-            fill      => 'black',
-            font      => '/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf',
-            pointsize => $msgFontSize,
-            geometry  => "-".int((1920-$videoFrameWidth)/2-$msgX)."+$msgY",
-            gravity   => 'north',
-            text      => "$MC");
-
-        $upperLayer->Annotate(
-            fill      => 'black',
-            font      => '/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf',
-            pointsize => $msgFontSize,
-            geometry  => "+".(1920-$videoFrameWidth-$msgX)."+$msgY",
-            gravity   => 'northeast',
-            text      => "$CC");
-
-        # ERROR
-        if( $self->{output}{error}{position} == $input ){
+            # MSG
             $upperLayer->Draw(
-                fill      => 'rgba(255, 0, 0, 0.5)',
-                points    => "$errorX1,$errorY1 $errorX2,$errorY2",
+                fill      => 'white',
+                points    => "$msgX,$msgY $msgX2,$msgY2",
                 gravity   => 'northwest',
                 primitive => 'rectangle');
 
             $upperLayer->Annotate(
                 fill      => 'black',
                 font      => '/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf',
-                pointsize => $errorFontSize,
-                geometry  => "-$errorTextX-$errorTextY",
-                gravity   => 'center',
-                text      => "ERROR");       
+                pointsize => $msgFontSize,
+                geometry  => "+$msgX+$msgY",
+                gravity   => 'northwest',
+                text      => $BR[$input]);
+
+            $upperLayer->Annotate(
+                fill      => 'black',
+                font      => '/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf',
+                pointsize => $msgFontSize,
+                geometry  => "-".int((1920-$videoFrameWidth)/2-$msgX)."+$msgY",
+                gravity   => 'north',
+                text      => $MC[$input]);
+
+            $upperLayer->Annotate(
+                fill      => 'black',
+                font      => '/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf',
+                pointsize => $msgFontSize,
+                geometry  => "+".(1920-$videoFrameWidth-$msgX)."+$msgY",
+                gravity   => 'northeast',
+                text      => $CC[$input]);
+
+            # ERROR
+            if( $self->{output}{error}{position} == $input ){
+                $upperLayer->Draw(
+                    fill      => 'rgba(255, 0, 0, 0.5)',
+                    points    => "$errorX1,$errorY1 $errorX2,$errorY2",
+                    gravity   => 'northwest',
+                    primitive => 'rectangle');
+
+                $upperLayer->Annotate(
+                    fill      => 'black',
+                    font      => '/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf',
+                    pointsize => $errorFontSize,
+                    geometry  => "-$errorTextX-$errorTextY",
+                    gravity   => 'center',
+                    text      => "ERROR");       
+            }
+            $input++;
         }
-        $input++;
     }
 
 
@@ -723,20 +733,28 @@ sub buildTlay {
     my $fixedClockLayer = Image::Magick->new();
     $fixedClockLayer->Read('top_layer/upper_layer.png');
 
-    foreach my $frame ( $self->{output}{frame}{clock}) {
+    my $x;
+    my $y;
+    my $width;
+    my $height;
 
-        my $x      = $frame->{position}{x};
-        my $y      = $frame->{position}{y};
-        my $width  = $frame->{size}{width};
-        my $height = $frame->{size}{height};
+    foreach my $frame ( @{ $self->{output}{frameList} } ) {
+        if($frame->{serviceId} eq "clock"){
+            $x      = $frame->{position}{x};
+            $y      = $frame->{position}{y};
+            $width  = $frame->{size}{width};
+            $height = $frame->{size}{height};
+        }
     }
+
+    print "$x, $y, $width, $height\n";
 
     # Urino središče
     my $clockCenterX = int($x + $width/2);
     my $clockCenterY = int($y + $height/2);
 
     # Krog
-    my $circleRadius = $self->{output}{frame}{clock}{height}*0.9/2;
+    my $circleRadius = $height*0.9/2;
     my $circleX      = $clockCenterX ;
     my $circleY      = $clockCenterY;
     my $circleOffSetEdgeX = $clockCenterX;
