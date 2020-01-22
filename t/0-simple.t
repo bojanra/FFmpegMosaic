@@ -19,6 +19,4 @@ ok( ! $m->compileConfig(), 'Validate sample.yaml');
 
 say $m->report();
 
-#ok( $m->report(), "Reporting");
-
 say $m->buildCmd();

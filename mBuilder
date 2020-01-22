@@ -22,6 +22,7 @@ generate such an output.
 
 Please install:
  libsmart-comments-perl libbareword-filehandles-perl libindirect-perl libmultidimensional-perl libstrictures-perl liblog-log4perl-perl libmoo-perl
+ libimage-magick-perl
 
 =cut
 

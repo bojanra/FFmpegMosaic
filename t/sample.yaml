@@ -7,7 +7,7 @@ source:
   multicast2:
     url: video/ts_kratek.ts
   nekaj:
-    url: video/tsm_sample_kratek.ts
+    url: video/nekaj.ts
   file1:
     url: video/ts_kratek.ts
 service:
@@ -16,6 +16,7 @@ service:
     source: multicast2
     video: 0
     audio: 0
+    audio1: 1
   mm:
     name: TV SLO 2
     source: multicast1
@@ -28,8 +29,14 @@ service:
     video: 0
     audio: 0
     audio1: 1
+  NEWYEAR:
+    name: novoleto
+    source: nekaj
+    video: 1
+    audio: 0
+    audio1: 1
 output:
-  format: 2x2
+  format: 4x4
   size: 1920x1080
   destination: 239.10.10.1:1234
   topLayer: top_layer/active_layer.png
@@ -39,6 +46,7 @@ output:
     text: ERROR
   layout:
     - test
+    - NEWYEAR
     - 1
     - clock
     - mm

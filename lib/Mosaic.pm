@@ -90,7 +90,7 @@ sub compileConfig {
 
 
     my $c = $self->config;
-    say YAML::XS::Dump($self);
+#    say YAML::XS::Dump($self);
 
     # source defined?
     if ( exists $c->{source} ) {
@@ -115,7 +115,7 @@ sub compileConfig {
         my $o      = $c->{output};
         my $output = $self->{output};
 
-        if ( exists $o->{format} && $o->{format} =~ m/.*(\d+)x(\d).*/ ) {
+        if ( exists $o->{format} && $o->{format} =~ m/.*?(\d+)x(\d).*?/ ) {
             $output->{format} = {
                 x => $1,
                 y => $2
@@ -243,12 +243,12 @@ sub serviceAdd {
 =cut
 
 sub frameAdd {
-    my ( $self, $serviceId, $x, $y, $width, $height, $audiox, $audioy, $audioWidth, $audioHeight ) = @_;
+    my ( $self, $serviceId, $x, $y, $width, $height) = @_;
 
-    $audioWidth  = int($width*0.01);
-    $audioHeight = $height-30;
-    $audiox      = $x + $width - $audioWidth*2-4;
-    $audioy      = $y;
+    my $audioWidth  = int($width*0.01);
+    my $audioHeight = $height-30;
+    my $audioX      = $x + $width - $audioWidth*2-4;
+    my $audioY      = $y;
 
     if ( exists $self->{service}{$serviceId} ) {
         my $frame = {
@@ -262,8 +262,8 @@ sub frameAdd {
                 height => $height
             },
             audioPosition  => {
-                x => $audiox,
-                y => $audioy,
+                x => $audioX,
+                y => $audioY,
             },
             audioSize => {
                 width  => $audioWidth,
@@ -272,36 +272,13 @@ sub frameAdd {
         };
         push( @{ $self->{output}{frameList} }, $frame );
 
-        # mark used services
+        # mark service in use
         if ( exists $self->{service}{$serviceId}{count} ) {
             $self->{service}{$serviceId}{count} += 1;
         } else {
             $self->{service}{$serviceId}{count} = 1;
         }
-
-        # mark used sources
-        my $sourceId = $self->{service}{$serviceId}{source};
-        if ( exists $self->{source}{$sourceId}{count} ) {
-            $self->{source}{$sourceId}{count} += 1;
-        } else {
-            $self->{source}{$sourceId}{count} = 1;
-        }
-    } elsif( $serviceId eq "clock"){
-
-        my $frame = {
-            serviceId => $serviceId,
-            position  => {
-                x => $x,
-                y => $y
-            },
-            size => {
-                width  => $width,
-                height => $height
-            }
-        };
-        push( @{ $self->{output}{frameList} }, $frame );
-
-    } else {
+    }  else {
         $self->error("service [$serviceId] not found");
     }
 } ## end sub frameAdd
@@ -315,7 +292,13 @@ sub frameAdd {
 sub fixConfig {
     my ($self) = @_;
 
-    # clean
+    # mark sources in use
+    while ( my ( $serviceId, $value ) = each %{ $self->{service} } ) {
+        my $sourceId = $value->{source};
+        $self->{source}{$sourceId}{count} = 1;
+    }
+
+    # delete unused sources
     while ( my ( $sourceId, $value ) = each %{ $self->{source} } ) {
         delete $self->{source}{$sourceId} if !exists $value->{count};
     }
@@ -342,7 +325,6 @@ sub fixConfig {
     # copy service to output
     foreach my $frame ( @{ $self->{output}{frameList} } ) {
         if ( exists $frame->{serviceId} ) {
-            say "**";
             my $serviceId = $frame->{serviceId};
             my $service   = $self->{service}{$serviceId};
             push( @{ $self->{output}{serviceList} }, $service );
@@ -408,6 +390,7 @@ sub report {
     #   say YAML::XS::Dump( $self->{output});
     return $line;
 
+
 } ## end sub report
 
 =head3 buildScreen()
@@ -423,20 +406,17 @@ sub buildScreen {
         die "unsupported layout configuration";
     }
 
-    say( "Output pixel size: ", $output->{size}{x},   "x", $output->{size}{y} );
-    say( "Output layout    : ", $output->{format}{x}, "x", $output->{format}{y} );
-
     my $i         = 0;
     my $maxFrames = $output->{format}{x} * $output->{format}{y};
 
     my $line = "";
 
-    my $spacingX = int( $output->{size}{x}*0.02 / ($output->{format}{x}-1) );
+    my $spacingX = $output->{format}{x} > 1 ? int( $output->{size}{x}*0.02 / ($output->{format}{x}-1) ) : 0;
     my $spacingY = int( $spacingX * 9/16 );
     my $edgeX    = int( $output->{size}{x}*0.01/2 );
     my $edgeY    = int( $edgeX * 9/16 );
 
-    while ( $i < $maxFrames ) {
+    while ( $i < $maxFrames and $i < scalar( @{$output->{layout}})) {
 
         # get service from list
         my $serviceId = $output->{layout}[$i];
@@ -456,10 +436,9 @@ sub buildScreen {
         my $y = $row * ($height + $spacingY) + $edgeY;
 
         # add frame to screen
-        $self->frameAdd( $serviceId, $x, $y, $width, $height) if $serviceId;
-
-#        $self->frameClockAdd( $x, $y, $width, $height);
-
+        if( $serviceId !~ /clock/i ) {
+            $self->frameAdd( $serviceId, $x, $y, $width, $height);
+        }
     } continue {
         $i += 1;
     }
@@ -468,8 +447,6 @@ sub buildScreen {
 } ## end sub buildScreen
 
 =head3 buildCmd()
-
-
 
  Build commandline for starting the ffmpeg . This includes all specified input sources .
 
@@ -480,7 +457,9 @@ sub buildCmd {
 
     my @cmd = ();
 
-    push( @cmd, "#!/bin/bash \n\n ffmpegX -y -re" );
+    push( @cmd, "ffmpegX" );
+    push( @cmd, "-y" );
+    push( @cmd, "-re" );
 
     # sources
     foreach my $source ( @{ $self->{output}{sourceList} } ) {
@@ -488,7 +467,10 @@ sub buildCmd {
     }
 
     my $topLayerInput = $self->config->{output}{topLayer};
-    push( @cmd, "-loop 1 -f image2 -r 25 -i \'$topLayerInput\' \\\n" );
+    push( @cmd, "-loop 1" );
+    push( @cmd, "-f image2" );
+    push( @cmd, "-r 25");
+    push( @cmd, " -i \'$topLayerInput\'" );
 
     # map
     my $input = 0;
@@ -507,6 +489,8 @@ sub buildCmd {
     push( @cmd, "-map ". $input .":v");
     push( @cmd, "\\\n-filter_complex");
     
+    return join( "\n", @cmd );
+
 
     # imput scale
     push( @cmd, "\" \\\nnullsrc=1920x1080, lutrgb=126:126:126 [base];");
@@ -569,9 +553,9 @@ sub buildCmd {
                 my $audioWidth  = $frame->{audioSize}{width};
                 my $audioHeight = $frame->{audioSize}{height};
 
-                my $audiox = $frame->{audioPosition}{x} - ($audioWidth*2+6)*$audioN;
-                my $audioy = $frame->{audioPosition}{y};
-                $parameter = "[$source.$id:layer]; [$source.$id:layer][$source.$id:a] overlay=shortest=1:x=$audiox: y=$audioy ";
+                my $audioX = $frame->{audioPosition}{x} - ($audioWidth*2+6)*$audioN;
+                my $audioY = $frame->{audioPosition}{y};
+                $parameter = "[$source.$id:layer]; [$source.$id:layer][$source.$id:a] overlay=shortest=1:x=$audioX: y=$audioY ";
                 
                 push( @cmd, $parameter );
                 $audioN++;
