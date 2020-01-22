@@ -276,6 +276,21 @@ sub frameAdd {
         } else {
             $self->{service}{$serviceId}{count} = 1;
         }
+    } elsif( $serviceId eq "clock"){
+
+        my $frame = {
+            serviceId => $serviceId,
+            position  => {
+                x => $x,
+                y => $y
+            },
+            size => {
+                width  => $width,
+                height => $height
+            }
+        };
+        push( @{ $self->{output}{frameList} }, $frame );
+
     } else {
         $self->error("service [$serviceId] not found");
     }

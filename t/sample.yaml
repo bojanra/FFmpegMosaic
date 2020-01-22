@@ -9,32 +9,38 @@ source:
   nekaj:
     url: video/nekaj.ts
   file1:
-    url: video/ts_kratek.ts
+    url: udp://239.1.1.22:5500 
 service:
   1:
     name: TV SLO 1
-    source: multicast2
-    video: 0
-    audio: 0
-    audio1: 1
-  mm:
+    source: file1
+    video: 0x78
+    audio: 0x79
+  2:
     name: TV SLO 2
-    source: multicast1
-    video: 0
-    audio: 0
-    audio1: 1
-  test:
-    name: Koper
-    source: nekaj
-    video: 0
-    audio: 0
-    audio1: 1
-  NEWYEAR:
-    name: novoleto
-    source: nekaj
-    video: 1
-    audio: 0
-    audio1: 1
+    source: file1
+    video: 0x8c
+    audio: 0x8d
+  3:
+    name: TV SLO 3
+    source: file1
+    video: 0xa0
+    audio: 0xa1
+  4:
+    name: TV MARIBOR
+    source: file1
+    video: 0xb4
+    audio: 0xb5
+  5:
+    name: TV KOPER
+    source: file1
+    video: 0xc8
+    audio: 0xc9
+  6:
+    name: VAS KANAL
+    source: file1
+    video: 0x12c
+    audio: 0x12d
 output:
   format: 4x4
   size: 1920x1080
@@ -45,8 +51,5 @@ output:
     position: 1
     text: ERROR
   layout:
-    - test
-    - NEWYEAR
     - 1
     - clock
-    - mm
