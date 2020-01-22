@@ -73,20 +73,20 @@ if ( $app->compileConfig() ) {
     exit(1);
 }
 
-say $app->report();
-
 if ( exists $args{c} ) {
+
     # just validate
     exit;
 } else {
-    say $app->buildCmd();
+    my $line = $app->buildCmd();
 
     # Zapis v FFmpeg file
     my $mosaicFFmpeg = 'mosaic_FFmpeg.sh';
-    open(my $fh, '>', $mosaicFFmpeg);
-        print $fh $app->buildCmd();
-    close $fh;
-    
+    open( my $fh, '>', $mosaicFFmpeg );
+    print( $fh "#!/bin/bash\n" );
+    print( $fh $line . "\n" );
+    close($fh);
+
     say $app->buildTlay();
     exit;
-}
+} ## end else [ if ( exists $args{c} )]
