@@ -466,7 +466,7 @@ sub buildCmd {
 
     my @cmd = ();
 
-    push( @cmd, "ffmpegX" );
+    push( @cmd, "./ffmpegX" );
     push( @cmd, "-y" );
     push( @cmd, "-re" );
 
@@ -478,7 +478,7 @@ sub buildCmd {
     my $topLayerInput = $self->config->{output}{topLayer};
     push( @cmd, "-loop 1" );
     push( @cmd, "-f image2" );
-    push( @cmd, "-r 25" );
+    push( @cmd, "-r 1" );
     push( @cmd, "-i \'$topLayerInput\'" );
 
     # map
@@ -491,18 +491,18 @@ sub buildCmd {
             my $id     = $service->{$component};
             my $tag    = $component =~ /video/ ? 'v' : 'a';
 
-            push( @cmd, "-map $source:$tag:$id" );
+            #push( @cmd, "-map $source:$tag:#$id" );
+            if($source >= $input){
+                $input = $source+1;
+            }
         } ## end foreach my $component ( 'video'...)
-        $input++;
     } ## end foreach my $service ( @{ $self...})
 
-    push( @cmd, "-map " . $input . ":v" );
-    push( @cmd, "-filter_complex" );
+    #push( @cmd, "-map " . $input . ":v" );
+    push( @cmd, "\\\n-filter_complex" );
 
     # imput scale
-    push( @cmd, "\"nullsrc=1920x1080, lutrgb=126:126:126 [base];" );
-
-    $input = 0;
+    push( @cmd, "\"nullsrc=1920x1080, lutrgb=126:126:126 [base];\\\n" );
 
     foreach my $frame ( @{ $self->{output}{frameList} } ) {
         if ( $frame->{serviceId} ne "clock" ) {
@@ -515,7 +515,7 @@ sub buildCmd {
             my $width  = $frame->{size}{width};
             my $height = $frame->{size}{height};
 
-            $scale = "[$source:$tag:$id] setpts=PTS-STARTPTS, scale=" . $width . "x" . $height . " [$source:v];";
+            $scale = "[$source:$tag:#$id] setpts=PTS-STARTPTS, scale=" . $width . "x" . $height . " [$source.$id:v];\\\n";
 
             push( @cmd, $scale );
 
@@ -528,14 +528,13 @@ sub buildCmd {
                 my $audioHeight = $frame->{audioSize}{height};
 
                 $scale =
-                    "[$source:$tag:$id] showvolume=f=0.5:c=0x00ffff:b=4:w=$audioHeight:h=$audioWidth:o=v:ds=log:dm=2:p=1, format=yuv420p [$source.$id:a];";
+                    "[$source:$tag:#$id] showvolume=f=0.5:c=0x00ffff:b=4:w=$audioHeight:h=$audioWidth:o=v:ds=log:dm=2:p=1, format=yuv420p [$source.$id:a];\\\n";
 
                 push( @cmd, $scale );
             } ## end foreach my $component ( 'audio'...)
-            $input++;
         } ## end if ( $frame->{serviceId...})
     } ## end foreach my $frame ( @{ $self...})
-    push( @cmd, "[" . $input . ":v] setpts=PTS-STARTPTS, scale=1920x1080 [topLayer];" );
+    push( @cmd, "[" . $input . ":v] setpts=PTS-STARTPTS, scale=1920x1080 [topLayer];\\\n" );
 
     # parameters
     push( @cmd, "[base]" );
@@ -546,10 +545,11 @@ sub buildCmd {
             my $parameter;
             my $service = $frame->{serviceId};
             my $source  = $self->{service}{$service}{source};
+            my $id  = $self->{service}{$service}{video};
 
             my $x = $frame->{position}{x};
             my $y = $frame->{position}{y};
-            $parameter = "[$source:v] overlay=shortest=1: x=$x: y=$y";
+            $parameter = "[$source.$id:v] overlay=shortest=1: x=$x: y=$y";
 
             push( @cmd, $parameter );
 
@@ -568,11 +568,11 @@ sub buildCmd {
                 push( @cmd, $parameter );
                 $audioN++;
             } ## end foreach my $component ( 'audio1'...)
-            push( @cmd, "[$source:layer]; [$source:layer]" );
+            push( @cmd, "[$source.$id:layer]; [$source.$id:layer]\\\n" );
         } ## end if ( $frame->{serviceId...})
     } ## end foreach my $frame ( @{ $self...})
 
-    push( @cmd, "[topLayer] overlay=shortest=1: x=0: y=0\"" );
+    push( @cmd, "[topLayer] overlay=shortest=1: x=0: y=0\"\\\n" );
 
     push( @cmd, "-strict experimental" );
     push( @cmd, "-vcodec libx264" );      # choose output codec
@@ -585,7 +585,7 @@ sub buildCmd {
     push( @cmd, "-level 4.0" );
     push( @cmd, "-an" );
     push( @cmd, "-threads 0" );           # allow multithreading
-    push( @cmd, "-f mpegts udp://".$self->config->{output}{destination}."?pkt_size=1316");
+    push( @cmd, "\\\n-f mpegts udp://".$self->config->{output}{destination}."?pkt_size=1316");
 
 # -f segment -segment_list /var/www/html/playlist.m3u8 -segment_list_flags +live -segment_time 10 /var/www/html/out%03d.ts");
 
@@ -653,9 +653,9 @@ sub buildTlay {
             my $msgFontSize        = 30;
             my $msgRowBottomOffset = 0;
             my $msgRowHight        = int( $msgFontSize * $fontScaleY + $msgRowBottomOffset );
-            my @BR                 = ( "2,56 Mb", "2,56 Mb", "2,56 Mb", "2,56 Mb", "2,56 Mb" );
-            my @MC    = ( "239.239.100.100", "239.239.100.200", "239.239.100.300", "239.239.100.200", "239.239.100.300" );
-            my @CC    = ( ">56001", ">56002", ">56003", ">56002", ">56003" );
+            my $BR                 = "2,56 Mb";
+            my $MC    = "239.239.100.100";
+            my $CC    = ">56001";
             my $msgX  = $videoFramePositionX;
             my $msgY  = $videoFramePositionY + $videoFrameHeight - $msgRowHight;
             my $msgX2 = $msgX + $videoFrameWidth;
@@ -697,7 +697,7 @@ sub buildTlay {
                 pointsize => $msgFontSize,
                 geometry  => "+$msgX+$msgY",
                 gravity   => 'northwest',
-                text      => $BR[$input]
+                text      => $BR
             );
 
             $upperLayer->Annotate(
@@ -706,7 +706,7 @@ sub buildTlay {
                 pointsize => $msgFontSize,
                 geometry  => "-" . int( ( 1920 - $videoFrameWidth ) / 2 - $msgX ) . "+$msgY",
                 gravity   => 'north',
-                text      => $MC[$input]
+                text      => $MC
             );
 
             $upperLayer->Annotate(
@@ -715,7 +715,7 @@ sub buildTlay {
                 pointsize => $msgFontSize,
                 geometry  => "+" . ( 1920 - $videoFrameWidth - $msgX ) . "+$msgY",
                 gravity   => 'northeast',
-                text      => $CC[$input]
+                text      => $CC
             );
 
             # ERROR
