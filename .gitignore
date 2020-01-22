@@ -4,6 +4,7 @@
 nytprof
 nytprof.out
 tmp/*
+top_layer/*
 kristof/*
 ffmpeg
 ffprobe

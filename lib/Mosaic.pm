@@ -276,7 +276,7 @@ sub frameAdd {
         } else {
             $self->{service}{$serviceId}{count} = 1;
         }
-    } elsif( $serviceId eq "clock"){
+    } elsif ( $serviceId eq "clock" ) {
 
         my $frame = {
             serviceId => $serviceId,
@@ -290,7 +290,6 @@ sub frameAdd {
             }
         };
         push( @{ $self->{output}{frameList} }, $frame );
-
     } else {
         $self->error("service [$serviceId] not found");
     }
@@ -444,9 +443,7 @@ sub buildScreen {
         my $y = $row * ( $height + $spacingY ) + $edgeY;
 
         # add frame to screen
-        if ( $serviceId !~ /clock/i ) {
-            $self->frameAdd( $serviceId, $x, $y, $width, $height );
-        }
+        $self->frameAdd( $serviceId, $x, $y, $width, $height );
     } continue {
         $i += 1;
     }
@@ -462,11 +459,11 @@ sub buildScreen {
 =cut
 
 sub buildCmd {
-    my ($self, $pretty) = @_;
+    my ( $self, $pretty ) = @_;
 
     my @cmd = ();
 
-    push( @cmd, "./ffmpegX" );
+    push( @cmd, "ffmpegX" );
     push( @cmd, "-y" );
     push( @cmd, "-re" );
 
@@ -478,7 +475,7 @@ sub buildCmd {
     my $topLayerInput = $self->config->{output}{topLayer};
     push( @cmd, "-loop 1" );
     push( @cmd, "-f image2" );
-    push( @cmd, "-r 1" );
+    push( @cmd, "-r 1" );                    # refresh rate for image
     push( @cmd, "-i \'$topLayerInput\'" );
 
     # map
@@ -491,18 +488,16 @@ sub buildCmd {
             my $id     = $service->{$component};
             my $tag    = $component =~ /video/ ? 'v' : 'a';
 
-            #push( @cmd, "-map $source:$tag:#$id" );
-            if($source >= $input){
-                $input = $source+1;
+            if ( $source >= $input ) {
+                $input = $source + 1;
             }
         } ## end foreach my $component ( 'video'...)
     } ## end foreach my $service ( @{ $self...})
 
-    #push( @cmd, "-map " . $input . ":v" );
-    push( @cmd, "\\\n-filter_complex" );
+    push( @cmd, "-filter_complex" );
 
     # imput scale
-    push( @cmd, "\"nullsrc=1920x1080, lutrgb=126:126:126 [base];\\\n" );
+    push( @cmd, "\"nullsrc=1920x1080, lutrgb=126:126:126 [base];" );
 
     foreach my $frame ( @{ $self->{output}{frameList} } ) {
         if ( $frame->{serviceId} ne "clock" ) {
@@ -515,7 +510,7 @@ sub buildCmd {
             my $width  = $frame->{size}{width};
             my $height = $frame->{size}{height};
 
-            $scale = "[$source:$tag:#$id] setpts=PTS-STARTPTS, scale=" . $width . "x" . $height . " [$source.$id:v];\\\n";
+            $scale = "[$source:$tag:#$id] setpts=PTS-STARTPTS, scale=" . $width . "x" . $height . " [$source.$id:v];";
 
             push( @cmd, $scale );
 
@@ -528,13 +523,13 @@ sub buildCmd {
                 my $audioHeight = $frame->{audioSize}{height};
 
                 $scale =
-                    "[$source:$tag:#$id] showvolume=f=0.5:c=0x00ffff:b=4:w=$audioHeight:h=$audioWidth:o=v:ds=log:dm=2:p=1, format=yuv420p [$source.$id:a];\\\n";
+                    "[$source:$tag:#$id] showvolume=f=0.5:c=0x00ffff:b=4:w=$audioHeight:h=$audioWidth:o=v:ds=log:dm=2:p=1, format=yuv420p [$source.$id:a];";
 
                 push( @cmd, $scale );
             } ## end foreach my $component ( 'audio'...)
         } ## end if ( $frame->{serviceId...})
     } ## end foreach my $frame ( @{ $self...})
-    push( @cmd, "[" . $input . ":v] setpts=PTS-STARTPTS, scale=1920x1080 [topLayer];\\\n" );
+    push( @cmd, "[" . $input . ":v] setpts=PTS-STARTPTS, scale=1920x1080 [topLayer];" );
 
     # parameters
     push( @cmd, "[base]" );
@@ -545,7 +540,7 @@ sub buildCmd {
             my $parameter;
             my $service = $frame->{serviceId};
             my $source  = $self->{service}{$service}{source};
-            my $id  = $self->{service}{$service}{video};
+            my $id      = $self->{service}{$service}{video};
 
             my $x = $frame->{position}{x};
             my $y = $frame->{position}{y};
@@ -563,19 +558,19 @@ sub buildCmd {
 
                 my $audioX = $frame->{audioPosition}{x} - ( $audioWidth * 2 + 6 ) * $audioN;
                 my $audioY = $frame->{audioPosition}{y};
-                $parameter = "[$source.$id:layer]; [$source.$id:layer][$source.$id:a] overlay=shortest=1:x=$audioX: y=$audioY ";
+                $parameter = "[$source.$id:layer]; [$source.$id:layer][$source.$id:a] overlay=shortest=1:x=$audioX: y=$audioY";
 
                 push( @cmd, $parameter );
                 $audioN++;
             } ## end foreach my $component ( 'audio1'...)
-            push( @cmd, "[$source.$id:layer]; [$source.$id:layer]\\\n" );
+            push( @cmd, "[$source.$id:layer]; [$source.$id:layer]" );
         } ## end if ( $frame->{serviceId...})
     } ## end foreach my $frame ( @{ $self...})
 
-    push( @cmd, "[topLayer] overlay=shortest=1: x=0: y=0\"\\\n" );
+    push( @cmd, "[topLayer] overlay=shortest=1: x=0: y=0\"" );
 
     push( @cmd, "-strict experimental" );
-    push( @cmd, "-vcodec libx264" );      # choose output codec
+    push( @cmd, "-vcodec libx264" );                                                              # choose output codec
     push( @cmd, "-b:v 4M" );
     push( @cmd, "-minrate 3M" );
     push( @cmd, "-maxrate 3M" );
@@ -584,19 +579,19 @@ sub buildCmd {
     push( @cmd, "-profile:v high" );
     push( @cmd, "-level 4.0" );
     push( @cmd, "-an" );
-    push( @cmd, "-threads 0" );           # allow multithreading
-    push( @cmd, "\\\n-f mpegts udp://".$self->config->{output}{destination}."?pkt_size=1316");
+    push( @cmd, "-threads 0" );                                                                   # allow multithreading
+    push( @cmd, "-f mpegts udp://" . $self->config->{output}{destination} . "?pkt_size=1316" );
 
 # -f segment -segment_list /var/www/html/playlist.m3u8 -segment_list_flags +live -segment_time 10 /var/www/html/out%03d.ts");
 
-    if( $pretty) {
+    if ($pretty) {
         my @list = ();
         my $line = "";
         foreach (@cmd) {
         }
-        return join( "\n", @list);
+        return join( "\n", @list );
     } else {
-        return join( " ", @cmd );
+        return join( " \\\n", @cmd );
     }
 } ## end sub buildCmd
 
@@ -620,7 +615,7 @@ sub buildTlay {
 
     # izdelava osnovne plasti
     my $upperLayer;
-    my $pictureFormat = "1920x1080";
+    my $pictureFormat = "1920x1080";    #TODO
 
     $upperLayer = Image::Magick->new();
     $upperLayer->Set( size => $pictureFormat );
@@ -654,12 +649,12 @@ sub buildTlay {
             my $msgRowBottomOffset = 0;
             my $msgRowHight        = int( $msgFontSize * $fontScaleY + $msgRowBottomOffset );
             my $BR                 = "2,56 Mb";
-            my $MC    = "239.239.100.100";
-            my $CC    = ">56001";
-            my $msgX  = $videoFramePositionX;
-            my $msgY  = $videoFramePositionY + $videoFrameHeight - $msgRowHight;
-            my $msgX2 = $msgX + $videoFrameWidth;
-            my $msgY2 = $msgY + $msgFontSize;
+            my $MC                 = "239.239.100.100";
+            my $CC                 = ">56001";
+            my $msgX               = $videoFramePositionX;
+            my $msgY               = $videoFramePositionY + $videoFrameHeight - $msgRowHight;
+            my $msgX2              = $msgX + $videoFrameWidth;
+            my $msgY2              = $msgY + $msgFontSize;
 
             #ERROR
             my $errorFontSize = $self->{output}{error}{font};
@@ -729,7 +724,7 @@ sub buildTlay {
 
                 $upperLayer->Annotate(
                     fill      => 'black',
-                    font      => '/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf',
+                    font      => $fond,
                     pointsize => $errorFontSize,
                     geometry  => "-$errorTextX-$errorTextY",
                     gravity   => 'center',
@@ -758,9 +753,6 @@ sub buildTlay {
             my $y      = $frame->{position}{y};
             my $width  = $frame->{size}{width};
             my $height = $frame->{size}{height};
-
-
-            print "$x, $y, $width, $height\n";
 
             # Urino središče
             my $clockCenterX = int( $x + $width / 2 );
