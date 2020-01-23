@@ -463,7 +463,7 @@ sub buildCmd {
 
     my @cmd = ();
 
-    push( @cmd, "ffmpegX" );
+    push( @cmd, "ffmpegY" );
     push( @cmd, "-y" );
     push( @cmd, "-re" );
 
@@ -1006,16 +1006,6 @@ sub buildTlay {
                     stroke      => $kazalecColor,
                     points      => "$clockCenterX,$clockCenterY $MinuteX,$MinuteY",
                     strokewidth => $thicknessMinute,
-                    primitive   => 'line'
-                );
-
-
-                # Sekundni kazalec
-                $activeLayer->Draw(
-                    fill        => $secentColor,
-                    stroke      => $secentColor,
-                    points      => "$clockCenterX,$clockCenterY $SecondX,$SecondY",
-                    strokewidth => $thicknessSecond,
                     primitive   => 'line'
                 );
 
