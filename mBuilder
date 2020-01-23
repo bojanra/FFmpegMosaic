@@ -84,7 +84,9 @@ if ( exists $args{c} ) {
     my $mosaicFFmpeg = 'mosaic_FFmpeg.sh';
     open( my $fh, '>', $mosaicFFmpeg );
     print( $fh "#!/bin/bash\n" );
-    print( $fh "".$line . "\n" );
+
+    print( $fh $line . "\n" );
+
     close($fh);
 
     say $app->buildTlay();

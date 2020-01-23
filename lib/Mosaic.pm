@@ -245,8 +245,8 @@ sub frameAdd {
 
     my $audioWidth  = int( $width * 0.01 );
     my $audioHeight = $height - 30;
-    my $audioX      = $x + $width;
-    my $audioY      = $y;
+    my $audioX      = $stackX + $width;
+    my $audioY      = $stackY;
 
     if ( exists $self->{service}{$serviceId} ) {
         my $frame = {
@@ -296,8 +296,8 @@ sub frameAdd {
                 height => $height
             },
             stack => {
-                width  => $stackWidth,
-                height => $stackHeight,
+                width    => $stackWidth,
+                height   => $stackHeight,
                 position => $stackPosition
             }
         };
@@ -461,27 +461,27 @@ sub buildScreen {
 
         my $stackPosition = "";
 
-        if ($col+$row != 0){
-            $stackPosition = "|"
+        if ( $col + $row != 0 ) {
+            $stackPosition = "|";
         }
 
-        if ($col == 0){
+        if ( $col == 0 ) {
             $stackPosition .= "0";
-        }else{
+        } else {
             $stackPosition .= "w0";
-            for(my $i=1; $i < $col; $i++){
+            for ( my $i = 1 ; $i < $col ; $i++ ) {
                 $stackPosition .= "+w$i";
             }
-        }
+        } ## end else [ if ( $col == 0 ) ]
 
-        if ($row == 0){
+        if ( $row == 0 ) {
             $stackPosition .= "_0";
-        }else{
+        } else {
             $stackPosition .= "_h0";
-            for(my $i=1; $i < $row; $i++){
+            for ( my $i = 1 ; $i < $row ; $i++ ) {
                 $stackPosition .= "+h$i";
             }
-        }
+        } ## end else [ if ( $row == 0 ) ]
 
         # add frame to screen
         $self->frameAdd( $serviceId, $x, $y, $width, $height, $stackX, $stackY, $stackWidth, $stackHeight, $stackPosition );
@@ -553,7 +553,10 @@ sub buildCmd {
             my $stackWidth  = $frame->{stack}{width};
             my $stackHeight = $frame->{stack}{height};
 
+
             $scale = "nullsrc=" . $stackWidth . "x" . $stackHeight . ", lutrgb=126:126:126 [$source.$id:base]; [$source:$tag:#$id] setpts=PTS-STARTPTS, scale=" . $width . "x" . $height . " [$source.$id:v];";
+
+
 
             push( @cmd, $scale );
 
@@ -578,15 +581,15 @@ sub buildCmd {
     #push( @cmd, "[base]" );
 
     $input = 0;
-    my $nFrame = 0; #number of frames
+    my $nFrame      = 0;    #number of frames
     my $stackString = "";
-    my $stackLayer = "";
+    my $stackLayer  = "";
     foreach my $frame ( @{ $self->{output}{frameList} } ) {
         if ( $frame->{serviceId} ne "clock" ) {
             my $parameter;
-            my $service = $frame->{serviceId};
-            my $source  = $self->{service}{$service}{source};
-            my $id      = $self->{service}{$service}{video};
+            my $service       = $frame->{serviceId};
+            my $source        = $self->{service}{$service}{source};
+            my $id            = $self->{service}{$service}{video};
             my $stackPosition = $frame->{stack}{position};
 
             my $x = $frame->{stack}{x};
@@ -600,13 +603,15 @@ sub buildCmd {
 
                 next if !exists $self->{service}{$service}{$component};
                 my $id          = $self->{service}{$service}{$component};
+
                 my $width  = $frame->{size}{width};
+
                 my $audioWidth  = $frame->{audioSize}{width};
                 my $audioHeight = $frame->{audioSize}{height};
 
-                my $audioX = $frame->{audioPosition}{x} - ( $audioWidth * 2 + 6 ) * $audioN;
+                my $audioX = $frame->{audioPosition}{x};
                 my $audioY = $frame->{audioPosition}{y};
-                $parameter = "[$source.$id:layer]; [$source.$id:layer][$source.$id:a] overlay=shortest=1:x=$width: y=0";
+                $parameter = "[$source.$id:layer]; [$source.$id:layer][$source.$id:a] overlay=shortest=1:x=$audioX: y=0";
 
                 push( @cmd, $parameter );
                 $audioN++;
@@ -618,23 +623,29 @@ sub buildCmd {
             $nFrame++;
         } ## end if ( $frame->{serviceId...})
 
-        
+
     } ## end foreach my $frame ( @{ $self...})
 
 
-    push( @cmd, $stackLayer ."xstack=inputs=". $nFrame. ":layout=". $stackString ."[v];[v][topLayer] overlay=shortest=1: x=0: y=0\"" );
+    push( @cmd,
+              $stackLayer
+            . "xstack=inputs="
+            . $nFrame
+            . ":layout="
+            . $stackString
+            . "[v];[v][topLayer] overlay=shortest=1: x=0: y=0\"" );
 
-    #push( @cmd, "-strict experimental" );
-    #push( @cmd, "-vcodec libx264" );                                                              # choose output codec
-    #push( @cmd, "-b:v 4M" );
-    #push( @cmd, "-minrate 3M" );
-    #push( @cmd, "-maxrate 3M" );
-    #push( @cmd, "-bufsize 6M" );
-    #push( @cmd, "-preset ultrafast" );
-    #push( @cmd, "-profile:v high" );
-    #push( @cmd, "-level 4.0" );
-    #push( @cmd, "-an" );
-    #push( @cmd, "-threads 0" );                                                                   # allow multithreading
+#    push( @cmd, "-strict experimental" );
+#    push( @cmd, "-vcodec libx264" );                                                              # choose output codec
+#    push( @cmd, "-b:v 4M" );
+#    push( @cmd, "-minrate 3M" );
+#    push( @cmd, "-maxrate 3M" );
+#    push( @cmd, "-bufsize 6M" );
+#    push( @cmd, "-preset ultrafast" );
+#    push( @cmd, "-profile:v high" );
+#    push( @cmd, "-level 4.0" );
+#    push( @cmd, "-an" );
+#    push( @cmd, "-threads 0" );                                                                   # allow multithreading
     push( @cmd, "-f mpegts udp://" . $self->config->{output}{destination} . "?pkt_size=1316" );
 
 # -f segment -segment_list /var/www/html/playlist.m3u8 -segment_list_flags +live -segment_time 10 /var/www/html/out%03d.ts");
