@@ -1,20 +1,31 @@
 #!/bin/bash
 
-./ffmpegX -y -i "udp://239.1.1.22:5500?overrun_nonfatal=1&fifo_size=50000000" -loop 1 -f image2 -r 1 -i 'top_layer/active_layer.png'\
+ffmpegY -y -i "udp://239.1.1.22:5500?overrun_nonfatal=1&fifo_size=50000000" -loop 1 -f image2 -r 1 -i 'top_layer/active_layer.png'\
  -filter_complex "\
- [i:'0x78'] setpts=PTS-STARTPTS, scale=624x351 [0x78:v];\
- [0:a:#0x79] showvolume=f=0.5:c=0x00ffff:b=4:w=318:h=6:o=v:ds=log:dm=2:p=1, format=yuv420p [0.0x79:a];\
- [i:'0x8c'] setpts=PTS-STARTPTS, scale=624x351 [0x8c:v];\
- [0:a:#0x8d] showvolume=f=0.5:c=0x00ffff:b=4:w=318:h=6:o=v:ds=log:dm=2:p=1, format=yuv420p [0.0x8d:a];\
- [i:'0xa0'] setpts=PTS-STARTPTS, scale=624x351 [0xa0:v];\
- [0:a:#0xa1] showvolume=f=0.5:c=0x00ffff:b=4:w=318:h=6:o=v:ds=log:dm=2:p=1, format=yuv420p [0.0xa1:a];\
- [i:'0xb4'] setpts=PTS-STARTPTS, scale=624x351 [0xb4:v];\
- [0:a:#0xb5] showvolume=f=0.5:c=0x00ffff:b=4:w=318:h=6:o=v:ds=log:dm=2:p=1, format=yuv420p [0.0xc9:a];\
- [i:'0xc8'] setpts=PTS-STARTPTS, scale=624x351 [0xc8:v];\
- [0:a:#0xc9] showvolume=f=0.5:c=0x00ffff:b=4:w=318:h=6:o=v:ds=log:dm=2:p=1, format=yuv420p [0.0x12d:a];\
- [i:'0x12c'] setpts=PTS-STARTPTS, scale=624x351 [0x12c:v];\
- [0:a:#0x12d] showvolume=f=0.5:c=0x00ffff:b=4:w=318:h=6:o=v:ds=log:dm=2:p=1, format=yuv420p [0.0x12d:a];\
+ nullsrc=624x351, lutrgb=126:126:126 [base0]; \
+nullsrc=624x351, lutrgb=126:126:126 [base1]; \
+nullsrc=624x351, lutrgb=126:126:126 [base2]; \
+nullsrc=624x351, lutrgb=126:126:126 [base3]; \
+nullsrc=624x351, lutrgb=126:126:126 [base4]; \
+nullsrc=624x351, lutrgb=126:126:126 [base5]; \
+ [0:v:#0x78] setpts=PTS-STARTPTS, scale=608x351 [0x78:v];\
+ [0:a:#0x79] showvolume=f=0.5:c=0x00ffff:b=4:w=351:h=6:o=v:ds=log:dm=2:p=1, format=yuv420p [0.0x79:a]; \
+ [0:v:#0x8c] setpts=PTS-STARTPTS, scale=608x351 [0x8c:v];\
+ [0:a:#0x8d] showvolume=f=0.5:c=0x00ffff:b=4:w=318:h=6:o=v:ds=log:dm=2:p=1, format=yuv420p [0.0x8d:a]; \
+ [0:v:#0xa0] setpts=PTS-STARTPTS, scale=608x351 [0xa0:v];\
+ [0:a:#0xa1] showvolume=f=0.5:c=0x00ffff:b=4:w=318:h=6:o=v:ds=log:dm=2:p=1, format=yuv420p [0.0xa1:a]; \
+ [0:v:#0xb4] setpts=PTS-STARTPTS, scale=608x351 [0xb4:v];\
+ [0:a:#0xb5] showvolume=f=0.5:c=0x00ffff:b=4:w=318:h=6:o=v:ds=log:dm=2:p=1, format=yuv420p [0.0xc5:a]; \
+ [0:v:#0xc8] setpts=PTS-STARTPTS, scale=608x351 [0xc8:v];\
+ [0:a:#0xc9] showvolume=f=0.5:c=0x00ffff:b=4:w=318:h=6:o=v:ds=log:dm=2:p=1, format=yuv420p [0.0xc9:a]; \
+ [0:v:#0x12c] setpts=PTS-STARTPTS, scale=608x351 [0x12c:v];\
+ [0:a:#0x12d] showvolume=f=0.5:c=0x00ffff:b=4:w=318:h=6:o=v:ds=log:dm=2:p=1, format=yuv420p [0.0x12d:a]; \
  [1:v] setpts=PTS-STARTPTS, scale=1920x1080 [topLayer];\
- [0x78:v][0x8c:v][0xa0:v][0xb4:v][0xc8:v][0x12c:v]xstack=inputs=6:layout=0_0|w0_0|w0+w1_0|0_h0|w0_h0|w0+w1_h0[v];[v][topLayer] overlay=shortest=1: x=0: y=0 [v1];" -map "[v1]"\
- -strict experimental -vcodec libx264 -b:v 4M -preset ultrafast  -profile:v high \
+ [base0][0x78:v] overlay=shortest=1: x=0: y=0 [layer0]; [layer0][0.0x79:a] overlay=shortest=1:x=608: y=0 [v0];\
+ [base1][0x8c:v] overlay=shortest=1: x=0: y=0 [layer1]; [layer1][0.0x8d:a] overlay=shortest=1:x=608: y=0 [v1];\
+ [base2][0xa0:v] overlay=shortest=1: x=0: y=0 [layer2]; [layer2][0.0xa1:a] overlay=shortest=1:x=608: y=0 [v2];\
+ [base3][0xb4:v] overlay=shortest=1: x=0: y=0 [layer3]; [layer3][0.0xc5:a] overlay=shortest=1:x=608: y=0 [v3];\
+ [base4][0xc8:v] overlay=shortest=1: x=0: y=0 [layer4]; [layer4][0.0xc9:a] overlay=shortest=1:x=608: y=0 [v4];\
+ [base5][0x12c:v] overlay=shortest=1: x=0: y=0 [layer5]; [layer5][0.0x12d:a] overlay=shortest=1:x=608: y=0 [v5];\
+ [v0][v1][v2][v3][v4][v5]xstack=inputs=6:layout=0_0|w0_0|w0+w1_0|0_h0|w0_h0|w0+w1_h0[v];[v][topLayer] overlay=shortest=1: x=0: y=0 "\
  -f mpegts udp://172.30.1.41:5000?pkt_size=1316
