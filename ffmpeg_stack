@@ -2,7 +2,7 @@
 
 ffmpegY -y -i "udp://239.1.1.22:5500?overrun_nonfatal=1&fifo_size=50000000" -loop 1 -f image2 -r 1 -i 'top_layer/active_layer.png'\
  -filter_complex "\
- nullsrc=624x351, lutrgb=126:126:126 [base0]; \
+nullsrc=624x351, lutrgb=126:126:126 [base0]; \
 nullsrc=624x351, lutrgb=126:126:126 [base1]; \
 nullsrc=624x351, lutrgb=126:126:126 [base2]; \
 nullsrc=624x351, lutrgb=126:126:126 [base3]; \

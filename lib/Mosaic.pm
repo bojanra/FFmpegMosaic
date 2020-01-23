@@ -241,11 +241,11 @@ sub serviceAdd {
 =cut
 
 sub frameAdd {
-    my ( $self, $serviceId, $x, $y, $width, $height, $stackWidth, $stackHeight, $stackPosition ) = @_;
+    my ( $self, $serviceId, $x, $y, $width, $height, $stackX, $stackY, $stackWidth, $stackHeight, $stackPosition ) = @_;
 
     my $audioWidth  = int( $width * 0.01 );
     my $audioHeight = $height - 30;
-    my $audioX      = $x + $width - $audioWidth * 2 - 4;
+    my $audioX      = $x + $width;
     my $audioY      = $y;
 
     if ( exists $self->{service}{$serviceId} ) {
@@ -268,6 +268,8 @@ sub frameAdd {
                 height => $audioHeight
             },
             stack => {
+                x => $stackX,
+                y => $stackY,
                 width  => $stackWidth,
                 height => $stackHeight,
                 position => $stackPosition
@@ -292,7 +294,7 @@ sub frameAdd {
             size => {
                 width  => $width,
                 height => $height
-            }
+            },
             stack => {
                 width  => $stackWidth,
                 height => $stackHeight,
@@ -452,6 +454,11 @@ sub buildScreen {
         my $x = $col * ( $width + $spacingX ) + $edgeX;
         my $y = $row * ( $height + $spacingY ) + $edgeY;
 
+        my $stackX = $edgeX;
+        my $stackY = $edgeY;
+        my $stackWidth  = int( $output->{size}{x} / $output->{format}{x} );
+        my $stackHeight = int( $width * 9 / 16 );
+
         my $stackPosition = "";
 
         if ($col+$row != 0){
@@ -477,7 +484,7 @@ sub buildScreen {
         }
 
         # add frame to screen
-        $self->frameAdd( $serviceId, $x, $y, $width, $height, $stackWidth, $stackHeight, $stackPosition );
+        $self->frameAdd( $serviceId, $x, $y, $width, $height, $stackX, $stackY, $stackWidth, $stackHeight, $stackPosition );
     } continue {
         $i += 1;
     }
@@ -543,8 +550,10 @@ sub buildCmd {
             my $tag    = 'v';
             my $width  = $frame->{size}{width};
             my $height = $frame->{size}{height};
+            my $stackWidth  = $frame->{stack}{width};
+            my $stackHeight = $frame->{stack}{height};
 
-            $scale = "nullsrc=" . $width . "x" . $height . ", lutrgb=126:126:126 [$source.$id:base]; [$source:$tag:#$id] setpts=PTS-STARTPTS, scale=" . $width . "x" . $height . " [$source.$id:v];";
+            $scale = "nullsrc=" . $stackWidth . "x" . $stackHeight . ", lutrgb=126:126:126 [$source.$id:base]; [$source:$tag:#$id] setpts=PTS-STARTPTS, scale=" . $width . "x" . $height . " [$source.$id:v];";
 
             push( @cmd, $scale );
 
@@ -580,9 +589,9 @@ sub buildCmd {
             my $id      = $self->{service}{$service}{video};
             my $stackPosition = $frame->{stack}{position};
 
-            my $x = $frame->{position}{x};
-            my $y = $frame->{position}{y};
-            $parameter = "[$source.$id:base][$source.$id:v] overlay=shortest=1: x=0: y=0";
+            my $x = $frame->{stack}{x};
+            my $y = $frame->{stack}{y};
+            $parameter = "[$source.$id:base][$source.$id:v] overlay=shortest=1: x=$x: y=$y";
 
             push( @cmd, $parameter );
 
@@ -591,7 +600,7 @@ sub buildCmd {
 
                 next if !exists $self->{service}{$service}{$component};
                 my $id          = $self->{service}{$service}{$component};
-                my $width  = $frame->{size}{width} - 16;
+                my $width  = $frame->{size}{width};
                 my $audioWidth  = $frame->{audioSize}{width};
                 my $audioHeight = $frame->{audioSize}{height};
 
@@ -615,17 +624,17 @@ sub buildCmd {
 
     push( @cmd, $stackLayer ."xstack=inputs=". $nFrame. ":layout=". $stackString ."[v];[v][topLayer] overlay=shortest=1: x=0: y=0\"" );
 
-    push( @cmd, "-strict experimental" );
-    push( @cmd, "-vcodec libx264" );                                                              # choose output codec
-    push( @cmd, "-b:v 4M" );
-    push( @cmd, "-minrate 3M" );
-    push( @cmd, "-maxrate 3M" );
-    push( @cmd, "-bufsize 6M" );
-    push( @cmd, "-preset ultrafast" );
-    push( @cmd, "-profile:v high" );
-    push( @cmd, "-level 4.0" );
-    push( @cmd, "-an" );
-    push( @cmd, "-threads 0" );                                                                   # allow multithreading
+    #push( @cmd, "-strict experimental" );
+    #push( @cmd, "-vcodec libx264" );                                                              # choose output codec
+    #push( @cmd, "-b:v 4M" );
+    #push( @cmd, "-minrate 3M" );
+    #push( @cmd, "-maxrate 3M" );
+    #push( @cmd, "-bufsize 6M" );
+    #push( @cmd, "-preset ultrafast" );
+    #push( @cmd, "-profile:v high" );
+    #push( @cmd, "-level 4.0" );
+    #push( @cmd, "-an" );
+    #push( @cmd, "-threads 0" );                                                                   # allow multithreading
     push( @cmd, "-f mpegts udp://" . $self->config->{output}{destination} . "?pkt_size=1316" );
 
 # -f segment -segment_list /var/www/html/playlist.m3u8 -segment_list_flags +live -segment_time 10 /var/www/html/out%03d.ts");
