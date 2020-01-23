@@ -241,7 +241,7 @@ sub serviceAdd {
 =cut
 
 sub frameAdd {
-    my ( $self, $serviceId, $x, $y, $width, $height ) = @_;
+    my ( $self, $serviceId, $x, $y, $width, $height, $stackWidth, $stackHeight, $stackPosition ) = @_;
 
     my $audioWidth  = int( $width * 0.01 );
     my $audioHeight = $height - 30;
@@ -266,6 +266,11 @@ sub frameAdd {
             audioSize => {
                 width  => $audioWidth,
                 height => $audioHeight
+            },
+            stack => {
+                width  => $stackWidth,
+                height => $stackHeight,
+                position => $stackPosition
             }
         };
         push( @{ $self->{output}{frameList} }, $frame );
@@ -287,6 +292,11 @@ sub frameAdd {
             size => {
                 width  => $width,
                 height => $height
+            }
+            stack => {
+                width  => $stackWidth,
+                height => $stackHeight,
+                position => $stackPosition
             }
         };
         push( @{ $self->{output}{frameList} }, $frame );
@@ -442,8 +452,32 @@ sub buildScreen {
         my $x = $col * ( $width + $spacingX ) + $edgeX;
         my $y = $row * ( $height + $spacingY ) + $edgeY;
 
+        my $stackPosition = "";
+
+        if ($col+$row != 0){
+            $stackPosition = "|"
+        }
+
+        if ($col == 0){
+            $stackPosition .= "0";
+        }else{
+            $stackPosition .= "w0";
+            for(my $i=1; $i < $col; $i++){
+                $stackPosition .= "+w$i";
+            }
+        }
+
+        if ($row == 0){
+            $stackPosition .= "_0";
+        }else{
+            $stackPosition .= "_h0";
+            for(my $i=1; $i < $row; $i++){
+                $stackPosition .= "+h$i";
+            }
+        }
+
         # add frame to screen
-        $self->frameAdd( $serviceId, $x, $y, $width, $height );
+        $self->frameAdd( $serviceId, $x, $y, $width, $height, $stackWidth, $stackHeight, $stackPosition );
     } continue {
         $i += 1;
     }
@@ -497,7 +531,7 @@ sub buildCmd {
     push( @cmd, "-filter_complex" );
 
     # imput scale
-    push( @cmd, "\"nullsrc=1920x1080, lutrgb=126:126:126 [base];" );
+    push( @cmd, "\"" );
 
     foreach my $frame ( @{ $self->{output}{frameList} } ) {
         if ( $frame->{serviceId} ne "clock" ) {
@@ -510,7 +544,7 @@ sub buildCmd {
             my $width  = $frame->{size}{width};
             my $height = $frame->{size}{height};
 
-            $scale = "[$source:$tag:#$id] setpts=PTS-STARTPTS, scale=" . $width . "x" . $height . " [$source.$id:v];";
+            $scale = "nullsrc=" . $width . "x" . $height . ", lutrgb=126:126:126 [$source.$id:base]; [$source:$tag:#$id] setpts=PTS-STARTPTS, scale=" . $width . "x" . $height . " [$source.$id:v];";
 
             push( @cmd, $scale );
 
@@ -532,19 +566,23 @@ sub buildCmd {
     push( @cmd, "[" . $input . ":v] setpts=PTS-STARTPTS, scale=1920x1080 [topLayer];" );
 
     # parameters
-    push( @cmd, "[base]" );
+    #push( @cmd, "[base]" );
 
     $input = 0;
+    my $nFrame = 0; #number of frames
+    my $stackString = "";
+    my $stackLayer = "";
     foreach my $frame ( @{ $self->{output}{frameList} } ) {
         if ( $frame->{serviceId} ne "clock" ) {
             my $parameter;
             my $service = $frame->{serviceId};
             my $source  = $self->{service}{$service}{source};
             my $id      = $self->{service}{$service}{video};
+            my $stackPosition = $frame->{stack}{position};
 
             my $x = $frame->{position}{x};
             my $y = $frame->{position}{y};
-            $parameter = "[$source.$id:v] overlay=shortest=1: x=$x: y=$y";
+            $parameter = "[$source.$id:base][$source.$id:v] overlay=shortest=1: x=0: y=0";
 
             push( @cmd, $parameter );
 
@@ -553,21 +591,29 @@ sub buildCmd {
 
                 next if !exists $self->{service}{$service}{$component};
                 my $id          = $self->{service}{$service}{$component};
+                my $width  = $frame->{size}{width} - 16;
                 my $audioWidth  = $frame->{audioSize}{width};
                 my $audioHeight = $frame->{audioSize}{height};
 
                 my $audioX = $frame->{audioPosition}{x} - ( $audioWidth * 2 + 6 ) * $audioN;
                 my $audioY = $frame->{audioPosition}{y};
-                $parameter = "[$source.$id:layer]; [$source.$id:layer][$source.$id:a] overlay=shortest=1:x=$audioX: y=$audioY";
+                $parameter = "[$source.$id:layer]; [$source.$id:layer][$source.$id:a] overlay=shortest=1:x=$width: y=0";
 
                 push( @cmd, $parameter );
                 $audioN++;
             } ## end foreach my $component ( 'audio1'...)
-            push( @cmd, "[$source.$id:layer]; [$source.$id:layer]" );
+            push( @cmd, "[$source.$id:layer];" );
+
+            $stackLayer  .= "[$source.$id:layer]";
+            $stackString .= "$stackPosition";
+            $nFrame++;
         } ## end if ( $frame->{serviceId...})
+
+        
     } ## end foreach my $frame ( @{ $self...})
 
-    push( @cmd, "[topLayer] overlay=shortest=1: x=0: y=0\"" );
+
+    push( @cmd, $stackLayer ."xstack=inputs=". $nFrame. ":layout=". $stackString ."[v];[v][topLayer] overlay=shortest=1: x=0: y=0\"" );
 
     push( @cmd, "-strict experimental" );
     push( @cmd, "-vcodec libx264" );                                                              # choose output codec
