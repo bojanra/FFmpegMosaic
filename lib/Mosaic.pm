@@ -500,7 +500,7 @@ sub buildCmd {
 
     my @cmd = ();
 
-    push( @cmd, "ffmpegY" );
+    push( @cmd, "ffmpeg" );
     push( @cmd, "-y" );
     push( @cmd, "-re" );
 
