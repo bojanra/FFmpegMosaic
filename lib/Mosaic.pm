@@ -633,22 +633,20 @@ sub buildCmd {
             . $nFrame
             . ":layout="
             . $stackString
-            . "[v];[v][topLayer] overlay=shortest=1: x=0: y=0\"" );
+            . "[v];[v][topLayer] overlay=shortest=1: x=0: y=0 [v1];[v1]split=2[out1][out2];\"" );
 
-#    push( @cmd, "-strict experimental" );
-#    push( @cmd, "-vcodec libx264" );                                                              # choose output codec
-#    push( @cmd, "-b:v 4M" );
-#    push( @cmd, "-minrate 3M" );
-#    push( @cmd, "-maxrate 3M" );
-#    push( @cmd, "-bufsize 6M" );
-#    push( @cmd, "-preset ultrafast" );
-#    push( @cmd, "-profile:v high" );
-#    push( @cmd, "-level 4.0" );
-#    push( @cmd, "-an" );
-#    push( @cmd, "-threads 0" );                                                                   # allow multithreading
-    push( @cmd, "-f mpegts udp://" . $self->config->{output}{destination} . "?pkt_size=1316" );
-
-# -f segment -segment_list /var/www/html/playlist.m3u8 -segment_list_flags +live -segment_time 10 /var/www/html/out%03d.ts");
+    push( @cmd, "-strict experimental" );
+    push( @cmd, "-vcodec libx264" );                                                              # choose output codec
+    push( @cmd, "-b:v 4M" );
+    push( @cmd, "-maxrate 8M" );
+    push( @cmd, "-bufsize 6M" );
+    push( @cmd, "-preset ultrafast" );
+    push( @cmd, "-profile:v high" );
+    push( @cmd, "-level 4.0" );
+    push( @cmd, "-an" );
+    push( @cmd, "-threads 0" );                                                                   # allow multithreading
+    push( @cmd, "-map '[out1]' -f mpegts udp://" . $self->config->{output}{destination} . "?pkt_size=1316" );
+    push( @cmd, "-map '[out2]' -f segment -segment_list /var/www/html/playlist.m3u8 -segment_list_flags +live -segment_time 1 -g 5 /var/www/html/out%03d.ts");
 
     if ($pretty) {
         my @list = ();
