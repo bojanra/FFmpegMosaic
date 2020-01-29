@@ -506,7 +506,6 @@ sub buildCmd {
 
     push( @cmd, "ffmpegY" );
     push( @cmd, "-y" );
-    push( @cmd, "-re" );
 
     # sources
     foreach my $source ( @{ $self->{output}{sourceList} } ) {
@@ -633,7 +632,7 @@ sub buildCmd {
             . $nFrame
             . ":layout="
             . $stackString
-            . "[v];[v][topLayer] overlay=shortest=1: x=0: y=0 [v1];[v1]split=2[out1][out2];\"" );
+            . "[v];[v][topLayer] overlay=shortest=1: x=0: y=0 [v1];[v1]split=2[out1][out2]\"" );
 
     push( @cmd, "-strict experimental" );
     push( @cmd, "-vcodec libx264" );                                                              # choose output codec
@@ -644,7 +643,8 @@ sub buildCmd {
     push( @cmd, "-profile:v high" );
     push( @cmd, "-level 4.0" );
     push( @cmd, "-an" );
-    push( @cmd, "-threads 0" );                                                                   # allow multithreading
+    push( @cmd, "-threads 0" );  
+ # allow multithreading
     push( @cmd, "-map '[out1]' -f mpegts udp://" . $self->config->{output}{destination} . "?pkt_size=1316" );
     push( @cmd, "-map '[out2]' -f segment -segment_list /var/www/html/playlist.m3u8 -segment_list_flags +live -segment_time 1 -g 5 /var/www/html/out%03d.ts");
 

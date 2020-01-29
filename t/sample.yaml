@@ -2,47 +2,54 @@
 # mosaicBuilder configuration file
 # ffprobe -show_programs  -of json -i udp://@239.10.10.1:1234 | less
 source:
-  multicast1:
-    url: video/tsm_sample_kratek.ts
-  multicast2:
-    url: video/ts_kratek.ts
-  nekaj:
-    url: video/nekaj.ts
   file1:
+    url: video/tsm_sample_kratek.ts
+  file2:
+    url: video/ts_kratek.ts
+  file3:
+    url: video/nekaj.ts
+  TS-TA_multicast:
     url: udp://239.1.1.22:5500?fifo_size=100000000\&buffer_size=52428800\&overrun_nonfatal=1
+  T2_multicast:
+    url: udp://239.8.1.31:5000?fifo_size=100000000\&buffer_size=52428800\&overrun_nonfatal=1
 service:
+  golica:
+    name: TV SLO 1
+    source: T2_multicast
+    video: 0xc8
+    audio: 0x12c
   1:
     name: TV SLO 1
-    source: file1
+    source: TS-TA_multicast
     video: 0x78
     audio: 0x79
   2:
     name: TV SLO 2
-    source: file1
+    source: TS-TA_multicast
     video: 0x8c
     audio: 0x8d
   3:
     name: TV SLO 3
-    source: file1
+    source: TS-TA_multicast
     video: 0xa0
     audio: 0xa1
   4:
     name: TV MARIBOR
-    source: file1
+    source: TS-TA_multicast
     video: 0xb4
     audio: 0xb5
   5:
     name: TV KOPER
-    source: file1
+    source: TS-TA_multicast
     video: 0xc8
     audio: 0xc9
   6:
     name: VAS KANAL
-    source: file1
+    source: TS-TA_multicast
     video: 0x12c
     audio: 0x12d
 output:
-  format: 4x4
+  format: 1x1
   size: 1920x1080
   destination: 172.30.1.41:5000
   topLayer: top_layer/active_layer.png
@@ -51,15 +58,5 @@ output:
     position: -1
     text: ERROR
   layout:
-    - 1
-    - 2
-    - 3
     - 4
-    - 5
-    - 6
-    - 1
-    - 2
-    - 3
-    - 4
-    - 5
-    - 6
+
