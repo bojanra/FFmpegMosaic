@@ -154,6 +154,8 @@ sub compileConfig {
     # cleanup the configuration
     $self->fixConfig();
 
+#    say $self->report();
+
     return scalar $self->{errorList};
 } ## end sub compileConfig
 
@@ -318,8 +320,10 @@ sub fixConfig {
 
     # mark sources in use
     while ( my ( $serviceId, $value ) = each %{ $self->{service} } ) {
-        my $sourceId = $value->{source};
-        $self->{source}{$sourceId}{count} = 1;
+        if( exists $value->{count}) {
+            my $sourceId = $value->{source};
+            $self->{source}{$sourceId}{count} = 1;
+        }
     }
 
     # delete unused sources
@@ -335,9 +339,11 @@ sub fixConfig {
 
     # clean and fillup service
     while ( my ( $serviceId, $value ) = each %{ $self->{service} } ) {
-        delete $self->{service}{$serviceId} if !exists $value->{count};
-        delete $value->{count};
-        $value->{source} = $self->{source}{ $value->{source} }{order};
+        if( exists $value->{count}) {
+            $value->{source} = $self->{source}{ $value->{source} }{order};
+        } else {
+            delete $self->{service}{$serviceId};
+        }
     }
 
     # copy sources to output
@@ -384,7 +390,7 @@ sub report {
             my $source = $service->{source};
             my $id     = $service->{$component};
             my $tag    = $component =~ /video/ ? 'v' : 'a';
-            $line .= sprintf( "   %2i:%s:%i %s\n", $source, $tag, $id, $component );
+            $line .= sprintf( "   %2i:%s:%s %s\n", $source, $tag, $id, $component );
         } ## end foreach my $component ( 'video'...)
     } ## end foreach my $service ( @{ $self...})
 
@@ -408,8 +414,6 @@ sub report {
 
     #   say YAML::XS::Dump( $self->{output});
     return $line;
-
-
 } ## end sub report
 
 =head3 buildScreen()
