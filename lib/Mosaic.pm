@@ -578,7 +578,7 @@ sub buildCmd {
             } ## end foreach my $component ( 'audio'...)
         } ## end if ( $frame->{serviceId...})
     } ## end foreach my $frame ( @{ $self...})
-    push( @cmd, "[" . $input . ":v] setpts=PTS-STARTPTS, scale=1920x1080 [topLayer];" );
+    push( @cmd, "[" . $input . ":v] setpts=PTS-STARTPTS, scale=" . $self->{output}{size}{x} . "x" . $self->{output}{size}{y} . " [topLayer];" );
 
     # parameters
     #push( @cmd, "[base]" );
@@ -644,13 +644,13 @@ sub buildCmd {
     push( @cmd, "-maxrate 8M" );
     push( @cmd, "-bufsize 6M" );
     push( @cmd, "-preset ultrafast" );
-    push( @cmd, "-profile:v high" );
-    push( @cmd, "-level 4.0" );
-    push( @cmd, "-an" );
-    push( @cmd, "-threads 0" );  
+    #push( @cmd, "-profile:v high" );
+    #push( @cmd, "-level 4.0" );
+    #push( @cmd, "-an" );
+    #push( @cmd, "-threads 0" );  
  # allow multithreading
     push( @cmd, "-map '[out1]' -f mpegts udp://" . $self->config->{output}{destination} . "?pkt_size=1316" );
-    push( @cmd, "-map '[out2]' -f segment -segment_wrap 10 -segment_list /var/www/html/playlist.m3u8 -segment_list_flags +live -segment_time 1 -g 5 /var/www/html/out%03d.ts");
+    push( @cmd, "-map '[out2]' -f segment -segment_wrap 10 -segment_list /var/www/html/playlist.m3u8 -segment_list_flags +live -segment_time 1 -g 10 /var/www/html/out%03d.ts");
 
     if ($pretty) {
         my @list = ();
@@ -683,7 +683,7 @@ sub buildTlay {
 
     # izdelava osnovne plasti
     my $upperLayer;
-    my $pictureFormat = "1920x1080";    #TODO
+    my $pictureFormat = "" . $self->{output}{size}{x} . "x" . $self->{output}{size}{y} . "";    #TODO
 
     $upperLayer = Image::Magick->new();
     $upperLayer->Set( size => $pictureFormat );
@@ -698,22 +698,22 @@ sub buildTlay {
         if ( $frame->{serviceId} ne "clock" ) {
 
             my $titleName           = $frame->{name};
-            my $videoFramePositionX = $frame->{position}{x};
-            my $videoFramePositionY = $frame->{position}{y};
+            my $videoFramePositionX = $frame->{stack}{x} + $frame->{stack}{width};
+            my $videoFramePositionY = $frame->{stack}{y} + $frame->{stack}{height};
             my $videoFrameWidth     = $frame->{size}{width};
             my $videoFrameHeight    = $frame->{size}{height};
 
             # Izračun kordinat
 
             # TITLE
-            my $titleFontSize     = 30;
-            my $titleRowTopOffset = 10;
-            my $titleOffsetX      = int( ( $videoFrameWidth - ( length($titleName) * $titleFontSize * $fontScaleX ) ) / 2 );
+            my $titleFontSize     = $self->{output}{size}{y}*0.03;
+            my $titleRowTopOffset = $self->{output}{size}{y}*0.01;
+            my $titleOffsetX      = int( $videoFramePositionX + $frame->{stack}{width}/2 );
             my $titleX            = $videoFramePositionX + $titleOffsetX;
             my $titleY            = $videoFramePositionY + $titleRowTopOffset;
 
             # MSG
-            my $msgFontSize        = 30;
+            my $msgFontSize        = $self->{output}{size}{y}*0.03;
             my $msgRowBottomOffset = 0;
             my $msgRowHight        = int( $msgFontSize * $fontScaleY + $msgRowBottomOffset );
             my $BR                 = "2,56 Mb";
@@ -730,8 +730,8 @@ sub buildTlay {
             my $errorY1       = $videoFramePositionY;
             my $errorX2       = $videoFramePositionX + $videoFrameWidth;
             my $errorY2       = $videoFramePositionY + $videoFrameHeight;
-            my $errorTextX    = int( ( 1920 - $videoFrameWidth ) / 2 - $videoFramePositionX );
-            my $errorTextY    = int( ( 1080 - $videoFrameHeight ) / 2 - $videoFramePositionY );
+            my $errorTextX    = int( ( $self->{output}{size}{x} - $videoFrameWidth ) / 2 - $videoFramePositionX );
+            my $errorTextY    = int( ( $self->{output}{size}{y} - $videoFrameHeight ) / 2 - $videoFramePositionY );
 
             # Urejanje ImegeMagic
 
@@ -834,8 +834,8 @@ sub buildTlay {
             my $circleOffSetEdgeY = $clockCenterY - $circleRadius;
 
             # Pozicija številk
-            my $clockCenterFromCenterX = int( 1920 / 2 - $clockCenterX );
-            my $clockCenterFromCenterY = int( 1080 / 2 - $clockCenterY );
+            my $clockCenterFromCenterX = int( $self->{output}{size}{x} / 2 - $clockCenterX );
+            my $clockCenterFromCenterY = int( $self->{output}{size}{y} / 2 - $clockCenterY );
 
             my $numberOffSetCenter = $circleRadius * 0.85;
 
