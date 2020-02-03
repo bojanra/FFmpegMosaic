@@ -804,6 +804,8 @@ sub buildTlay {
                 my $y      = $frame->{position}{y};
                 my $width  = $frame->{size}{width};
                 my $height = $frame->{size}{height};
+                my $x2     = $x + $width;
+                my $y2     = $y + $height;
 
                 # Barve
                 my $circleColor       = '#e8ddce';
@@ -823,6 +825,12 @@ sub buildTlay {
                 my $fontSize         = int( $circleRadius * 0.2 );
 
                 # Izdelava ozadja ure
+                $topLayer->Draw(
+                    fill        => 'rgb(126,126,126)',
+                    points      => "$x,$y $x2,$y2",
+                    primitive   => 'rectangle'
+                );
+
                 $topLayer->Draw(
                     fill        => $circleColor,
                     stroke      => $circleStrokeColor,
