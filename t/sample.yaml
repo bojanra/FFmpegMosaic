@@ -59,13 +59,13 @@ output:
   format: 2x2
   size: 720x405
   destination: 172.30.1.41:5500
-  topLayer: top_layer/active_layer.png
+  topLayer: top_layer/layer.png
   error:
     font: 50
     position: -1
     text: ERROR
   layout:
-    - 101
-    - 101
-    - 101
-    - 101
+    - 1
+    - 2
+    - 3
+    - 4
