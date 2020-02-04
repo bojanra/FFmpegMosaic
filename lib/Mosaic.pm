@@ -243,7 +243,7 @@ sub serviceAdd {
 =cut
 
 sub frameAdd {
-    my ( $self, $serviceId, $x, $y, $width, $height, $stackX, $stackY, $stackWidth, $stackHeight, $stackPosition ) = @_;
+    my ( $self, $serviceId, $x, $y, $width, $height, $stackX, $stackY, $stackWidth, $stackHeight ) = @_;
 
     my $audioWidth  = int( $stackWidth * 0.015 );
     my $audioHeight = int( $stackHeight - $self->{output}{size}{y}*0.03 );
@@ -274,7 +274,6 @@ sub frameAdd {
                 y => $stackY,
                 width  => $stackWidth,
                 height => $stackHeight,
-                position => $stackPosition
             }
         };
         push( @{ $self->{output}{frameList} }, $frame );
@@ -300,7 +299,6 @@ sub frameAdd {
             stack => {
                 width    => $stackWidth,
                 height   => $stackHeight,
-                position => $stackPosition
             }
         };
         push( @{ $self->{output}{frameList} }, $frame );
@@ -463,32 +461,9 @@ sub buildScreen {
         my $stackWidth  = int( $output->{size}{x}*0.95 / $output->{format}{x} );
         my $stackHeight = int( $stackWidth * 9 / 16 );
 
-        my $stackPosition = "";
-
-        if ( $col + $row != 0 ) {
-            $stackPosition = "|";
-        }
-
-        if ( $col == 0 ) {
-            $stackPosition .= "0";
-        } else {
-            $stackPosition .= "w0";
-            for ( my $i = 1 ; $i < $col ; $i++ ) {
-                $stackPosition .= "+w$i";
-            }
-        } ## end else [ if ( $col == 0 ) ]
-
-        if ( $row == 0 ) {
-            $stackPosition .= "_0";
-        } else {
-            $stackPosition .= "_h0";
-            for ( my $i = 1 ; $i < $row ; $i++ ) {
-                $stackPosition .= "+h$i";
-            }
-        } ## end else [ if ( $row == 0 ) ]
 
         # add frame to screen
-        $self->frameAdd( $serviceId, $x, $y, $width, $height, $stackX, $stackY, $stackWidth, $stackHeight, $stackPosition );
+        $self->frameAdd( $serviceId, $x, $y, $width, $height, $stackX, $stackY, $stackWidth, $stackHeight );
     } continue {
         $i += 1;
     }
@@ -507,6 +482,10 @@ sub buildCmd {
     my ( $self, $pretty ) = @_;
 
     my @cmd = ();
+    my $firstLevel  = "";
+    my @secondLevel = ();
+    my @thirdLevel  = ();
+    
 
     push( @cmd, "ffmpegY" );
     push( @cmd, "-y" );
@@ -516,33 +495,14 @@ sub buildCmd {
         push( @cmd, "-i \'" . $source->{url} . "\'" );
     }
 
-    my $topLayerInput = $self->config->{output}{topLayer};
-    push( @cmd, "-loop 1" );
-    push( @cmd, "-f image2" );
-    push( @cmd, "-r 1" );                    # refresh rate for image
-    push( @cmd, "-i \'$topLayerInput\'" );
-
-    # map
-    my $input = 0;
-    foreach my $service ( @{ $self->{output}{serviceList} } ) {
-        next if !exists $service->{name};
-        foreach my $component ( 'video', 'audio', 'audio1' ) {
-            next if !exists $service->{$component};
-            my $source = $service->{source};
-            my $id     = $service->{$component};
-            my $tag    = $component =~ /video/ ? 'v' : 'a';
-
-            if ( $source >= $input ) {
-                $input = $source + 1;
-            }
-        } ## end foreach my $component ( 'video'...)
-    } ## end foreach my $service ( @{ $self...})
-
     push( @cmd, "-filter_complex" );
 
     # imput scale
     push( @cmd, "\"" );
+    $firstLevel = join( " \\\n", @cmd );
+    @cmd = ();
 
+    my $nFrame = 0;
     foreach my $frame ( @{ $self->{output}{frameList} } ) {
         if ( $frame->{serviceId} ne "clock" ) {
             my $scale;
@@ -558,8 +518,6 @@ sub buildCmd {
 
 
             $scale = "nullsrc=" . $width . "x" . $height . ", lutrgb=126:126:126 [$source.$id:base]; [$source:$tag:#$id] setpts=PTS-STARTPTS, scale=" . $stackWidth . "x" . $stackHeight . " [$source.$id:v];";
-
-
 
             push( @cmd, $scale );
 
@@ -577,16 +535,21 @@ sub buildCmd {
                 push( @cmd, $scale );
             } ## end foreach my $component ( 'audio'...)
         } ## end if ( $frame->{serviceId...})
+        $nFrame++;
+        if ( $nFrame == $self->{output}{format}{x} ) { 
+            push( @secondLevel, join( " \\\n", @cmd ) );
+            @cmd = ();
+            $nFrame = 0;
+        }
+        
     } ## end foreach my $frame ( @{ $self...})
-    push( @cmd, "[" . $input . ":v] setpts=PTS-STARTPTS, scale=" . $self->{output}{size}{x} . "x" . $self->{output}{size}{y} . " [topLayer];" );
 
     # parameters
     #push( @cmd, "[base]" );
 
-    $input = 0;
-    my $nFrame      = 0;    #number of frames
-    my $stackString = "";
-    my $stackLayer  = "";
+    $nFrame = 0;    #number of frames
+    my $stack = "";
+    my @stackLayer  = ();
     foreach my $frame ( @{ $self->{output}{frameList} } ) {
         if ( $frame->{serviceId} ne "clock" ) {
             my $parameter;
@@ -601,13 +564,12 @@ sub buildCmd {
 
             push( @cmd, $parameter );
 
-            my $audioN = 0;
             foreach my $component ( 'audio1', 'audio' ) {
 
                 next if !exists $self->{service}{$service}{$component};
-                my $id          = $self->{service}{$service}{$component};
+                my $id = $self->{service}{$service}{$component};
 
-                my $width  = $frame->{size}{width};
+                my $width = $frame->{size}{width};
 
                 my $audioWidth  = $frame->{audioSize}{width};
                 my $audioHeight = $frame->{audioSize}{height};
@@ -617,25 +579,71 @@ sub buildCmd {
                 $parameter = "[$source.$id:layer]; [$source.$id:layer][$source.$id:a] overlay=shortest=1:x=$audioX: y=$audioY";
 
                 push( @cmd, $parameter );
-                $audioN++;
             } ## end foreach my $component ( 'audio1'...)
             push( @cmd, "[$source.$id:layer];" );
 
-            $stackLayer  .= "[$source.$id:layer]";
-            $stackString .= "$stackPosition";
-            $nFrame++;
+            $stack .= "[$source.$id:layer]";
+            
         } ## end if ( $frame->{serviceId...})
-
-
+        $nFrame++;
+        if ( $nFrame == $self->{output}{format}{x} ) { ## if element last image in row
+            push( @thirdLevel, join( " \\\n", @cmd ) );
+            push( @stackLayer, $stack);
+            $stack = "";
+            @cmd = ();
+            $nFrame = 0;
+        }
+         
     } ## end foreach my $frame ( @{ $self...})
 
+    my $nOut = 0;
+    my @outLevel = ();
+
+    while ( $nOut < $self->{output}{format}{y} ) {
+        push ( @outLevel, $firstLevel );
+        push ( @outLevel, $secondLevel[$nOut] );
+        push ( @outLevel, $thirdLevel[$nOut]) ;
+        push ( @outLevel, $stackLayer[$nOut] . "hstack=inputs=" . $self->{output}{format}{x} . "\"" );
+        push ( @outLevel, "-f mpegts udp://172.30.0.91:500".$nOut."?pkt_size=1316" );
+        
+        my $out = join( " \\\n", @outLevel );
+        my $mosaicFFmpeg = "FFmpeg$nOut";
+        open( my $fh, '>', $mosaicFFmpeg );
+        print( $fh "#!/bin/bash\n" );
+        print( $fh $out );
+        close($fh);
+        @outLevel = ();
+        $nOut++;
+    }
+    
+    @cmd = "";
+    push( @cmd, "ffmpegY" );
+    push( @cmd, "-y" );
+    $stack = "";
+    # sources
+    my $input = 0;
+    while ( $input < $self->{output}{format}{y} ) {
+        push( @cmd, "-i \'udp://172.30.0.91:500".$input."\'" );
+        $stack .= "[$input:v]";
+        $input++;
+    }
+
+    my $topLayerInput = $self->config->{output}{topLayer};
+    push( @cmd, "-loop 1" );
+    push( @cmd, "-f image2" );
+    push( @cmd, "-r 1" );                    # refresh rate for image
+    push( @cmd, "-i \'$topLayerInput\'" );
+
+    push( @cmd, "-filter_complex" );
+
+    # imput scale
+    push( @cmd, "\"" );
+    push( @cmd, "[" . $input . ":v] setpts=PTS-STARTPTS, scale=" . $self->{output}{size}{x} . "x" . $self->{output}{size}{y} . " [topLayer];" );
 
     push( @cmd,
-              $stackLayer
-            . "xstack=inputs="
-            . $nFrame
-            . ":layout="
-            . $stackString
+              $stack
+            . "vstack=inputs="
+            . $self->{output}{format}{y}
             . "[v];[v][topLayer] overlay=shortest=1: x=0: y=0 [v1];[v1]split=2[out1][out2]\"" );
 
     push( @cmd, "-strict experimental" );
@@ -662,6 +670,8 @@ sub buildCmd {
         return join( " \\\n", @cmd );
     }
 } ## end sub buildCmd
+
+
 
 
 ##################################### TOP LAYER #############################
