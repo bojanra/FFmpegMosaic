@@ -246,7 +246,7 @@ sub frameAdd {
     my ( $self, $serviceId, $x, $y, $width, $height, $stackX, $stackY, $stackWidth, $stackHeight ) = @_;
 
     my $audioWidth  = int( $stackWidth * 0.015 );
-    my $audioHeight = int( $stackHeight - $self->{output}{size}{y}*0.03 );
+    my $audioHeight = int( $stackHeight - $self->{output}{size}{y}*0.02 );
     my $audioX      = $stackX + $stackWidth - $audioWidth*2-4;
     my $audioY      = $stackY;
 
@@ -444,7 +444,7 @@ sub buildScreen {
 
         # calculate column x row from $i
         my $col = $i % $output->{format}{x};
-        my $row = int( $i / $output->{format}{y} );
+        my $row = int( $i / $output->{format}{x} );
         $line .= "\n" if $col == 0;
         $line .= sprintf( "[%7s    %2ix%2i] ", $serviceId // 'undef', $col, $row );
 
@@ -604,7 +604,7 @@ sub buildCmd {
         push ( @outLevel, $secondLevel[$nOut] );
         push ( @outLevel, $thirdLevel[$nOut]) ;
         push ( @outLevel, $stackLayer[$nOut] . "hstack=inputs=" . $self->{output}{format}{x} . "\"" );
-        push ( @outLevel, "-f mpegts udp://172.30.0.91:500".$nOut."?pkt_size=1316" );
+        push ( @outLevel, "-an -f mpegts udp://172.30.0.91:500".$nOut."?pkt_size=1316" );
         
         my $out = join( " \\\n", @outLevel );
         my $mosaicFFmpeg = "FFmpeg$nOut";
@@ -712,13 +712,13 @@ sub buildTlay {
 
                 # TITLE
                 my $titleName         = $frame->{name};
-                my $titleFontSize     = $self->{output}{size}{y}*0.03;
+                my $titleFontSize     = $self->{output}{size}{y}*0.02;
                 my $titleRowTopOffset = $self->{output}{size}{y}*0.01;
                 my $titleX            = int( $videoFramePositionX + $videoFrameWidth/2 - $self->{output}{size}{x}/2 );
                 my $titleY            = $videoFramePositionY + $titleRowTopOffset;
 
                 # MSG
-                my $msgFontSize        = $self->{output}{size}{y}*0.03;
+                my $msgFontSize        = $self->{output}{size}{y}*0.02;
                 my $msgRowBottomOffset = 0;
                 my $msgRowHight        = int( $msgFontSize * $fontScaleY + $msgRowBottomOffset );
                 my $BR                 = "2,56 Mb";
