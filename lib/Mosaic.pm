@@ -604,6 +604,8 @@ sub buildCmd {
         push ( @outLevel, $secondLevel[$nOut] );
         push ( @outLevel, $thirdLevel[$nOut]) ;
         push ( @outLevel, $stackLayer[$nOut] . "hstack=inputs=" . $self->{output}{format}{x} . "\"" );
+        #push ( @outLevel, "-vcodec libx264" );
+        #push ( @outLevel, "-preset ultrafast" ); 
         push ( @outLevel, "-an -f mpegts udp://172.30.0.91:500".$nOut."?pkt_size=1316" );
         
         my $out = join( " \\\n", @outLevel );
@@ -640,11 +642,14 @@ sub buildCmd {
     push( @cmd, "\"" );
     push( @cmd, "[" . $input . ":v] setpts=PTS-STARTPTS, scale=" . $self->{output}{size}{x} . "x" . $self->{output}{size}{y} . " [topLayer];" );
 
+    if ( $input > 1 ) {
+        $stack .= "vstack=inputs=";
+        $stack .= $self->{output}{format}{y};
+        $stack .= "[v];[v]";
+    }
     push( @cmd,
               $stack
-            . "vstack=inputs="
-            . $self->{output}{format}{y}
-            . "[v];[v][topLayer] overlay=shortest=1: x=0: y=0 [v1];[v1]split=2[out1][out2]\"" );
+            . "[topLayer] overlay=shortest=1: x=0: y=0 [v1];[v1]split=2[out1][out2]\"" );
 
     push( @cmd, "-strict experimental" );
     push( @cmd, "-vcodec libx264" );                                                              # choose output codec
@@ -652,13 +657,10 @@ sub buildCmd {
     push( @cmd, "-maxrate 8M" );
     push( @cmd, "-bufsize 6M" );
     push( @cmd, "-preset ultrafast" );
-    #push( @cmd, "-profile:v high" );
-    #push( @cmd, "-level 4.0" );
-    #push( @cmd, "-an" );
-    #push( @cmd, "-threads 0" );  
+      
  # allow multithreading
     push( @cmd, "-map '[out1]' -f mpegts udp://" . $self->config->{output}{destination} . "?pkt_size=1316" );
-    push( @cmd, "-map '[out2]' -f segment -segment_wrap 10 -segment_list /var/www/html/playlist.m3u8 -segment_list_flags +live -segment_time 1 -g 10 /var/www/html/out%03d.ts");
+    push( @cmd, "-map '[out2]' -f segment -segment_wrap 10 -segment_list /var/www/html/playlist.m3u8 -segment_list_flags +live -segment_time 2 -g 10 /var/www/html/out%03d.ts");
 
     if ($pretty) {
         my @list = ();
