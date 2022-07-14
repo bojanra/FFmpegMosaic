@@ -6,7 +6,7 @@ mBuilder - Build ffmpeg commandline string to produce a video mosaic
 
 =head1 SYNOPSIS
 
- mBuilder [options] configuration_file 
+ mBuilder [options] configuration_file
 
 =head1 OPTIONS
 
@@ -15,20 +15,19 @@ mBuilder - Build ffmpeg commandline string to produce a video mosaic
 
 =head1 DESCRIPTION
 
-mBuilder uses input file in YAML format and generates output string fir ffmpeg to 
+mBuilder uses input file in YAML format and generates output string for ffmpeg to
 generate such an output.
 
  If no configuration file is found, mBuilder will use mosaic.yaml
 
 Please install:
- libsmart-comments-perl libbareword-filehandles-perl libindirect-perl libmultidimensional-perl libstrictures-perl liblog-log4perl-perl libmoo-perl
- libimage-magick-perl
+ apt install libsmart-comments-perl libbareword-filehandles-perl libindirect-perl libmultidimensional-perl libstrictures-perl liblog-log4perl-perl libmoo-perl libimage-magick-perl
 
 =cut
 
 =head1 AUTHOR
 
-Copyright (C) Bojan Ramsak 2019
+Copyright (C) Bojan Ramsak 2019-2022
 
 All rights reserved
 
@@ -47,7 +46,7 @@ use Try::Tiny;
 use Smart::Comments;
 use open qw ( :std :encoding(UTF-8));
 
-our $VERSION = '0.11';
+our $VERSION = '0.12';
 
 my %args;
 
@@ -64,8 +63,6 @@ pod2usage(
 
 my $configFile = shift(@ARGV) // "mosaic.yaml";
 
-### using configfile: $configFile
-
 my $app = Mosaic->new( configFile => $configFile );
 
 if ( $app->compileConfig() ) {
@@ -76,11 +73,9 @@ if ( $app->compileConfig() ) {
 if ( exists $args{c} ) {
 
     # just validate
-    exit;
 } else {
     my $line = $app->buildCmd();
 
-    # Zapis v FFmpeg file
     my $mosaicFFmpeg = 'mosaic_FFmpeg.sh';
     open( my $fh, '>', $mosaicFFmpeg );
     print( $fh "#!/bin/bash\n" );
@@ -90,5 +85,6 @@ if ( exists $args{c} ) {
     close($fh);
 
     say $app->buildTlay();
-    exit;
 } ## end else [ if ( exists $args{c} )]
+
+exit;

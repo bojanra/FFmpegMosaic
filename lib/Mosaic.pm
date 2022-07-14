@@ -23,7 +23,6 @@ use POSIX qw(strftime);
 use File::Copy;
 use Data::Dumper;
 
-
 our $VERSION = '0.11';
 
 has 'configFile' => (
@@ -246,8 +245,8 @@ sub frameAdd {
     my ( $self, $serviceId, $x, $y, $width, $height, $stackX, $stackY, $stackWidth, $stackHeight ) = @_;
 
     my $audioWidth  = int( $stackWidth * 0.015 );
-    my $audioHeight = int( $stackHeight - $self->{output}{size}{y}*0.02 );
-    my $audioX      = $stackX + $stackWidth - $audioWidth*2-4;
+    my $audioHeight = int( $stackHeight - $self->{output}{size}{y} * 0.02 );
+    my $audioX      = $stackX + $stackWidth - $audioWidth * 2 - 4;
     my $audioY      = $stackY;
 
     if ( exists $self->{service}{$serviceId} ) {
@@ -270,8 +269,8 @@ sub frameAdd {
                 height => $audioHeight
             },
             stack => {
-                x => $stackX,
-                y => $stackY,
+                x      => $stackX,
+                y      => $stackY,
                 width  => $stackWidth,
                 height => $stackHeight,
             }
@@ -297,8 +296,8 @@ sub frameAdd {
                 height => $height
             },
             stack => {
-                width    => $stackWidth,
-                height   => $stackHeight,
+                width  => $stackWidth,
+                height => $stackHeight,
             }
         };
         push( @{ $self->{output}{frameList} }, $frame );
@@ -318,11 +317,11 @@ sub fixConfig {
 
     # mark sources in use
     while ( my ( $serviceId, $value ) = each %{ $self->{service} } ) {
-        if( exists $value->{count}) {
+        if ( exists $value->{count} ) {
             my $sourceId = $value->{source};
             $self->{source}{$sourceId}{count} = 1;
         }
-    }
+    } ## end while ( my ( $serviceId, ...))
 
     # delete unused sources
     while ( my ( $sourceId, $value ) = each %{ $self->{source} } ) {
@@ -337,12 +336,12 @@ sub fixConfig {
 
     # clean and fillup service
     while ( my ( $serviceId, $value ) = each %{ $self->{service} } ) {
-        if( exists $value->{count}) {
+        if ( exists $value->{count} ) {
             $value->{source} = $self->{source}{ $value->{source} }{order};
         } else {
             delete $self->{service}{$serviceId};
         }
-    }
+    } ## end while ( my ( $serviceId, ...))
 
     # copy sources to output
     foreach my $sourceId ( sort( { $self->{source}{$a}{order} <=> $self->{source}{$b}{order} } keys %{ $self->{source} } ) ) {
@@ -434,8 +433,8 @@ sub buildScreen {
 
     #my $spacingX = $output->{format}{x} > 1 ? int( $output->{size}{x} * 0.02 / ( $output->{format}{x} - 1 ) ) : 0;
     #my $spacingY = int( $spacingX * 9 / 16 );
-    my $edgeX    = int( $output->{size}{x} * 0.05 / ($output->{format}{x} + 1) );
-    my $edgeY    = int( $edgeX * 9 / 16 );
+    my $edgeX = int( $output->{size}{x} * 0.05 / ( $output->{format}{x} + 1 ) );
+    my $edgeY = int( $edgeX * 9 / 16 );
 
     while ( $i < $maxFrames and $i < scalar( @{ $output->{layout} } ) ) {
 
@@ -450,15 +449,15 @@ sub buildScreen {
 
         # and coordinates/width
 
-        my $width = int( $output->{size}{x} / $output->{format}{x} );
+        my $width  = int( $output->{size}{x} / $output->{format}{x} );
         my $height = int( $width * 9 / 16 );
 
         my $x = $col * $width;
         my $y = $row * $height;
 
-        my $stackX = $edgeX - $edgeX*$col / ($output->{format}{x});
-        my $stackY = $edgeY - $edgeY*$row / ($output->{format}{y});
-        my $stackWidth  = int( $output->{size}{x}*0.95 / $output->{format}{x} );
+        my $stackX = $edgeX - $edgeX * $col / ( $output->{format}{x} );
+        my $stackY = $edgeY - $edgeY * $row / ( $output->{format}{y} );
+        my $stackWidth  = int( $output->{size}{x} * 0.95 / $output->{format}{x} );
         my $stackHeight = int( $stackWidth * 9 / 16 );
 
 
@@ -473,7 +472,7 @@ sub buildScreen {
 
 =head3 buildCmd( $pretty)
 
- Build commandline for starting the ffmpeg . This includes all specified input sources .
+ Build commandline for starting the ffmpeg. This includes all specified input sources .
  Prettyprint if set $pretty.
 
 =cut
@@ -481,11 +480,11 @@ sub buildScreen {
 sub buildCmd {
     my ( $self, $pretty ) = @_;
 
-    my @cmd = ();
+    my @cmd         = ();
     my $firstLevel  = "";
     my @secondLevel = ();
     my @thirdLevel  = ();
-    
+
 
     push( @cmd, "ffmpegY" );
     push( @cmd, "-y" );
@@ -500,7 +499,7 @@ sub buildCmd {
     # imput scale
     push( @cmd, "\"" );
     $firstLevel = join( " \\\n", @cmd );
-    @cmd = ();
+    @cmd        = ();
 
     my $nFrame = 0;
     foreach my $frame ( @{ $self->{output}{frameList} } ) {
@@ -509,15 +508,22 @@ sub buildCmd {
             my $service = $frame->{serviceId};
             my $source  = $self->{service}{$service}{source};
 
-            my $id     = $self->{service}{$service}{video};
-            my $tag    = 'v';
-            my $width  = $frame->{size}{width};
-            my $height = $frame->{size}{height};
+            my $id          = $self->{service}{$service}{video};
+            my $tag         = 'v';
+            my $width       = $frame->{size}{width};
+            my $height      = $frame->{size}{height};
             my $stackWidth  = $frame->{stack}{width};
             my $stackHeight = $frame->{stack}{height};
 
 
-            $scale = "nullsrc=" . $width . "x" . $height . ", lutrgb=126:126:126 [$source.$id:base]; [$source:$tag:#$id] setpts=PTS-STARTPTS, scale=" . $stackWidth . "x" . $stackHeight . " [$source.$id:v];";
+            $scale =
+                  "nullsrc="
+                . $width . "x"
+                . $height
+                . ", lutrgb=126:126:126 [$source.$id:base]; [$source:$tag:#$id] setpts=PTS-STARTPTS, scale="
+                . $stackWidth . "x"
+                . $stackHeight
+                . " [$source.$id:v];";
 
             push( @cmd, $scale );
 
@@ -536,20 +542,20 @@ sub buildCmd {
             } ## end foreach my $component ( 'audio'...)
         } ## end if ( $frame->{serviceId...})
         $nFrame++;
-        if ( $nFrame == $self->{output}{format}{x} ) { 
+        if ( $nFrame == $self->{output}{format}{x} ) {
             push( @secondLevel, join( " \\\n", @cmd ) );
-            @cmd = ();
+            @cmd    = ();
             $nFrame = 0;
         }
-        
+
     } ## end foreach my $frame ( @{ $self...})
 
     # parameters
     #push( @cmd, "[base]" );
 
     $nFrame = 0;    #number of frames
-    my $stack = "";
-    my @stackLayer  = ();
+    my $stack      = "";
+    my @stackLayer = ();
     foreach my $frame ( @{ $self->{output}{frameList} } ) {
         if ( $frame->{serviceId} ne "clock" ) {
             my $parameter;
@@ -583,32 +589,33 @@ sub buildCmd {
             push( @cmd, "[$source.$id:layer];" );
 
             $stack .= "[$source.$id:layer]";
-            
+
         } ## end if ( $frame->{serviceId...})
         $nFrame++;
-        if ( $nFrame == $self->{output}{format}{x} ) { ## if element last image in row
+        if ( $nFrame == $self->{output}{format}{x} ) {    ## if element last image in row
             push( @thirdLevel, join( " \\\n", @cmd ) );
-            push( @stackLayer, $stack);
-            $stack = "";
-            @cmd = ();
+            push( @stackLayer, $stack );
+            $stack  = "";
+            @cmd    = ();
             $nFrame = 0;
-        }
-         
+        } ## end if ( $nFrame == $self->...)
+
     } ## end foreach my $frame ( @{ $self...})
 
-    my $nOut = 0;
+    my $nOut     = 0;
     my @outLevel = ();
 
     while ( $nOut < $self->{output}{format}{y} ) {
-        push ( @outLevel, $firstLevel );
-        push ( @outLevel, $secondLevel[$nOut] );
-        push ( @outLevel, $thirdLevel[$nOut]) ;
-        push ( @outLevel, $stackLayer[$nOut] . "hstack=inputs=" . $self->{output}{format}{x} . "\"" );
+        push( @outLevel, $firstLevel );
+        push( @outLevel, $secondLevel[$nOut] );
+        push( @outLevel, $thirdLevel[$nOut] );
+        push( @outLevel, $stackLayer[$nOut] . "hstack=inputs=" . $self->{output}{format}{x} . "\"" );
+
         #push ( @outLevel, "-vcodec libx264" );
-        #push ( @outLevel, "-preset ultrafast" ); 
-        push ( @outLevel, "-an -f mpegts udp://172.30.0.91:500".$nOut."?pkt_size=1316" );
-        
-        my $out = join( " \\\n", @outLevel );
+        #push ( @outLevel, "-preset ultrafast" );
+        push( @outLevel, "-an -f mpegts udp://172.30.0.91:500" . $nOut . "?pkt_size=1316" );
+
+        my $out          = join( " \\\n", @outLevel );
         my $mosaicFFmpeg = "FFmpeg$nOut";
         open( my $fh, '>', $mosaicFFmpeg );
         print( $fh "#!/bin/bash\n" );
@@ -616,16 +623,17 @@ sub buildCmd {
         close($fh);
         @outLevel = ();
         $nOut++;
-    }
-    
+    } ## end while ( $nOut < $self->{output...})
+
     @cmd = "";
     push( @cmd, "ffmpegY" );
     push( @cmd, "-y" );
     $stack = "";
+
     # sources
     my $input = 0;
     while ( $input < $self->{output}{format}{y} ) {
-        push( @cmd, "-i \'udp://172.30.0.91:500".$input."\'" );
+        push( @cmd, "-i \'udp://172.30.0.91:500" . $input . "\'" );
         $stack .= "[$input:v]";
         $input++;
     }
@@ -640,27 +648,33 @@ sub buildCmd {
 
     # imput scale
     push( @cmd, "\"" );
-    push( @cmd, "[" . $input . ":v] setpts=PTS-STARTPTS, scale=" . $self->{output}{size}{x} . "x" . $self->{output}{size}{y} . " [topLayer];" );
+    push( @cmd,
+              "["
+            . $input
+            . ":v] setpts=PTS-STARTPTS, scale="
+            . $self->{output}{size}{x} . "x"
+            . $self->{output}{size}{y}
+            . " [topLayer];" );
 
     if ( $input > 1 ) {
         $stack .= "vstack=inputs=";
         $stack .= $self->{output}{format}{y};
         $stack .= "[v];[v]";
     }
-    push( @cmd,
-              $stack
-            . "[topLayer] overlay=shortest=1: x=0: y=0 [v1];[v1]split=2[out1][out2]\"" );
+    push( @cmd, $stack . "[topLayer] overlay=shortest=1: x=0: y=0 [v1];[v1]split=2[out1][out2]\"" );
 
     push( @cmd, "-strict experimental" );
-    push( @cmd, "-vcodec libx264" );                                                              # choose output codec
+    push( @cmd, "-vcodec libx264" );        # choose output codec
     push( @cmd, "-b:v 4M" );
     push( @cmd, "-maxrate 8M" );
     push( @cmd, "-bufsize 6M" );
     push( @cmd, "-preset ultrafast" );
-      
- # allow multithreading
+
+    # allow multithreading
     push( @cmd, "-map '[out1]' -f mpegts udp://" . $self->config->{output}{destination} . "?pkt_size=1316" );
-    push( @cmd, "-map '[out2]' -f segment -segment_wrap 10 -segment_list /var/www/html/playlist.m3u8 -segment_list_flags +live -segment_time 2 -g 10 /var/www/html/out%03d.ts");
+    push( @cmd,
+        "-map '[out2]' -f segment -segment_wrap 10 -segment_list /var/www/html/playlist.m3u8 -segment_list_flags +live -segment_time 2 -g 10 /var/www/html/out%03d.ts"
+    );
 
     if ($pretty) {
         my @list = ();
@@ -672,9 +686,6 @@ sub buildCmd {
         return join( " \\\n", @cmd );
     }
 } ## end sub buildCmd
-
-
-
 
 ##################################### TOP LAYER #############################
 
@@ -696,7 +707,7 @@ sub buildTlay {
     # Pisanje podatkov na zadnjo plast
     my $topLayer;
     my $input = 0;
-    my $t = 0;
+    my $t     = 0;
     while (1) {
         $topLayer = Image::Magick->new();
         $topLayer->Set( size => "" . $self->{output}{size}{x} . "x" . $self->{output}{size}{y} . "" );
@@ -714,13 +725,13 @@ sub buildTlay {
 
                 # TITLE
                 my $titleName         = $frame->{name};
-                my $titleFontSize     = $self->{output}{size}{y}*0.02;
-                my $titleRowTopOffset = $self->{output}{size}{y}*0.01;
-                my $titleX            = int( $videoFramePositionX + $videoFrameWidth/2 - $self->{output}{size}{x}/2 );
+                my $titleFontSize     = $self->{output}{size}{y} * 0.02;
+                my $titleRowTopOffset = $self->{output}{size}{y} * 0.01;
+                my $titleX            = int( $videoFramePositionX + $videoFrameWidth / 2 - $self->{output}{size}{x} / 2 );
                 my $titleY            = $videoFramePositionY + $titleRowTopOffset;
 
                 # MSG
-                my $msgFontSize        = $self->{output}{size}{y}*0.02;
+                my $msgFontSize        = $self->{output}{size}{y} * 0.02;
                 my $msgRowBottomOffset = 0;
                 my $msgRowHight        = int( $msgFontSize * $fontScaleY + $msgRowBottomOffset );
                 my $BR                 = "2,56 Mb";
@@ -774,16 +785,18 @@ sub buildTlay {
                     fill      => 'black',
                     font      => '/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf',
                     pointsize => $msgFontSize,
-                    geometry  => "+" . int( $videoFramePositionX + $videoFrameWidth/2 - $self->{output}{size}{x}/2 ) . "+$msgY",
-                    gravity   => 'north',
-                    text      => $MC
+                    geometry  => "+"
+                        . int( $videoFramePositionX + $videoFrameWidth / 2 - $self->{output}{size}{x} / 2 )
+                        . "+$msgY",
+                    gravity => 'north',
+                    text    => $MC
                 );
 
                 $topLayer->Annotate(
                     fill      => 'black',
                     font      => '/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf',
                     pointsize => $msgFontSize,
-                    geometry  => "+" . int(-$msgX2 + $self->{output}{size}{x}) . "+$msgY",
+                    geometry  => "+" . int( -$msgX2 + $self->{output}{size}{x} ) . "+$msgY",
                     gravity   => 'northeast',
                     text      => $CC
                 );
@@ -810,7 +823,7 @@ sub buildTlay {
                 print "Upper layer \n";
             } else {
 
-    ############################################### URA #####################################################
+                ############################################### URA #####################################################
 
                 my $x      = $frame->{position}{x};
                 my $y      = $frame->{position}{y};
@@ -838,9 +851,9 @@ sub buildTlay {
 
                 # Izdelava ozadja ure
                 $topLayer->Draw(
-                    fill        => 'rgb(126,126,126)',
-                    points      => "$x,$y $x2,$y2",
-                    primitive   => 'rectangle'
+                    fill      => 'rgb(126,126,126)',
+                    points    => "$x,$y $x2,$y2",
+                    primitive => 'rectangle'
                 );
 
                 $topLayer->Draw(

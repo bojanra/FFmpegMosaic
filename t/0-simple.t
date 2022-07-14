@@ -11,11 +11,11 @@ BEGIN {
     use_ok("Mosaic") || print "Bail out!\n";
 }
 
-my $m = Mosaic->new( configFile => 't/sample.yaml');
+my $m = Mosaic->new( configFile => 't/sample.yaml' );
 
 isa_ok( $m, 'Mosaic' );
 
-ok( ! $m->compileConfig(), 'Validate sample.yaml');
+ok( !$m->compileConfig(), 'Validate sample.yaml' );
 
 say $m->report();
 

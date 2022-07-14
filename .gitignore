@@ -1,11 +1,11 @@
 *.un~
 .tidyall.d/
 .~*
+ffmpeg
+ffprobe
+kristof/*
+mosaic_FFmpeg.sh
 nytprof
 nytprof.out
 tmp/*
 top_layer/*
-kristof/*
-ffmpeg
-ffprobe
-mosaic_FFmpeg.sh

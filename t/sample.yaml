@@ -65,7 +65,7 @@ output:
     position: -1
     text: ERROR
   layout:
-    - 1
+    - clock
     - 2
     - 3
     - 4
