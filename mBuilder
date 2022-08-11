@@ -74,13 +74,13 @@ if ( exists $args{c} ) {
 
     # just validate
 } else {
-    my $line = $app->buildCmd();
+    my $script = $app->buildCmd();
 
     my $mosaicFFmpeg = 'mosaic_FFmpeg.sh';
     open( my $fh, '>', $mosaicFFmpeg );
     print( $fh "#!/bin/bash\n" );
 
-    print( $fh $line . "\n" );
+    print( $fh $script );
 
     close($fh);
 

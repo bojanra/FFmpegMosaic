@@ -30,10 +30,15 @@ service:
     video: 0
     audio: 1
 output:
-  format: my2x2
+  format: 2x2
   size: 1920x1080
   destination: 239.10.10.1:1234
-  mosaic:
+  topLayer: top_layer/layer.png
+  error:
+    font: 50
+    position: -1
+    text: ERROR
+  layout:
     - 3
     - 3
     - mm
